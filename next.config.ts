@@ -14,21 +14,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
-  output: "export",
-  async headers() {
-    return [
-      {
-        // Apply CSP to all routes
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: "default-src 'self'; img-src 'self' data: https://images.unsplash.com; script-src 'self'; style-src 'self' 'unsafe-inline';",
-          },
-        ],
-      },
-    ];
-  },
 };
 
 export default nextConfig;
