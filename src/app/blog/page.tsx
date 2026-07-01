@@ -6,10 +6,15 @@ import { Blog } from "@/lib/models/Blog";
 import { Calendar, Eye, ArrowRight, BookOpen } from "lucide-react";
 
 export default async function BlogArchivePage() {
-  await connectToDatabase();
-  const blogs = await Blog.find({ published: true })
-    .sort({ createdAt: -1 })
-    .lean() as any[];
+  let blogs: any[] = [];
+  try {
+    await connectToDatabase();
+    blogs = await Blog.find({ published: true })
+      .sort({ createdAt: -1 })
+      .lean() as any[];
+  } catch (error) {
+    console.error("Failed to fetch blogs:", error);
+  }
 
   return (
     <div className="flex flex-col">

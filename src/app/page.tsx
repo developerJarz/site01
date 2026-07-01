@@ -94,18 +94,26 @@ const WHY_CHOOSE_US = [
 ];
 
 export default async function Home() {
-  await connectToDatabase();
-  const trendingCars = await Listing.find({ status: "active" })
-    .sort({ views: -1 })
-    .limit(8)
-    .lean() as any[];
+  let trendingCars: any[] = [];
+  let latestCars: any[] = [];
+  let totalListings = 0;
 
-  const latestCars = await Listing.find({ status: "active" })
-    .sort({ createdAt: -1 })
-    .limit(4)
-    .lean() as any[];
+  try {
+    await connectToDatabase();
+    trendingCars = await Listing.find({ status: "active" })
+      .sort({ views: -1 })
+      .limit(8)
+      .lean() as any[];
 
-  const totalListings = await Listing.countDocuments({ status: "active" });
+    latestCars = await Listing.find({ status: "active" })
+      .sort({ createdAt: -1 })
+      .limit(4)
+      .lean() as any[];
+
+    totalListings = await Listing.countDocuments({ status: "active" });
+  } catch (error) {
+    console.error("Failed to fetch data from MongoDB:", error);
+  }
 
   return (
     <div className="flex flex-col">

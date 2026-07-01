@@ -27,18 +27,22 @@ export default async function CarDetailsPage(props: {
 }) {
   const { slug } = await props.params;
 
-  await connectToDatabase();
-
-  const car = await Listing.findOne({ slug })
-    .populate("sellerId", "name phone email role")
-    .lean() as any;
+  let car: any = null;
+  try {
+    await connectToDatabase();
+    car = await Listing.findOne({ slug })
+      .populate("sellerId", "name phone email role")
+      .lean() as any;
+  } catch (error) {
+    console.error("Failed to fetch car details:", error);
+  }
 
   if (!car) {
     notFound();
   }
 
   // Increment view counter (fire-and-forget)
-  Listing.updateOne({ _id: car._id }, { $inc: { views: 1 } }).exec();
+  try { Listing.updateOne({ _id: car._id }, { $inc: { views: 1 } }).exec(); } catch {}
 
   const seller = car.sellerId as any;
   const currentViews = (car.views || 0) + 1;

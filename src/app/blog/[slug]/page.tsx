@@ -18,25 +18,33 @@ export default async function BlogPostPage(props: {
 }) {
   const { slug } = await props.params;
 
-  await connectToDatabase();
-  const blog = (await Blog.findOne({ slug, published: true }).lean()) as any;
+  let blog: any = null;
+  let related: any[] = [];
+  try {
+    await connectToDatabase();
+    blog = (await Blog.findOne({ slug, published: true }).lean()) as any;
+
+    if (blog) {
+      // Increment view count
+      try { Blog.updateOne({ _id: blog._id }, { $inc: { views: 1 } }).exec(); } catch {}
+
+      // Get related posts
+      related = (await Blog.find({
+        published: true,
+        _id: { $ne: blog._id },
+      })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .select("title slug coverImage excerpt createdAt tags")
+        .lean()) as any[];
+    }
+  } catch (error) {
+    console.error("Failed to fetch blog post:", error);
+  }
 
   if (!blog) {
     notFound();
   }
-
-  // Increment view count
-  Blog.updateOne({ _id: blog._id }, { $inc: { views: 1 } }).exec();
-
-  // Get related posts
-  const related = (await Blog.find({
-    published: true,
-    _id: { $ne: blog._id },
-  })
-    .sort({ createdAt: -1 })
-    .limit(3)
-    .select("title slug coverImage excerpt createdAt tags")
-    .lean()) as any[];
 
   const formattedDate = new Date(blog.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
