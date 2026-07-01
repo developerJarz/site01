@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { Filter, SlidersHorizontal, MapPin, Search, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import axios from "axios";
 
 export default function CarsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 size={32} className="animate-spin text-primary" /></div>}>
+      <CarsContent />
+    </Suspense>
+  );
+}
+
+function CarsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
