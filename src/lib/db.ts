@@ -1,6 +1,29 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI || "";
+const RAW_MONGODB_URI = process.env.MONGODB_URI || "";
+
+/**
+ * Strip query parameters that Mongoose 9 does not support
+ * (retryWrites, w, appName are MongoDB driver options, not Mongoose options).
+ */
+function cleanMongoUri(uri: string): string {
+  try {
+    const url = new URL(uri);
+    // Remove params that Mongoose 9 rejects
+    const unsupported = ["retrywrites", "w", "appname"];
+    for (const key of [...url.searchParams.keys()]) {
+      if (unsupported.includes(key.toLowerCase())) {
+        url.searchParams.delete(key);
+      }
+    }
+    return url.toString();
+  } catch {
+    // If URL parsing fails, return as-is and let Mongoose handle it
+    return uri;
+  }
+}
+
+const MONGODB_URI = cleanMongoUri(RAW_MONGODB_URI);
 
 interface MongooseCache {
   conn: typeof mongoose | null;
