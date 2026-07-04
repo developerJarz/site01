@@ -90,12 +90,12 @@ function buildOtpHtml(otpCode: string): string {
 }
 
 export async function sendOtpEmail(email: string, otpCode: string) {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const smtpFrom = process.env.SMTP_FROM || smtpUser;
-  const brevoApiKey = process.env.BREVO_API_KEY;
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpPort = process.env.SMTP_PORT?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  const smtpFrom = (process.env.SMTP_FROM?.trim()) || smtpUser;
+  const brevoApiKey = process.env.BREVO_API_KEY?.trim();
 
   // If no SMTP credentials at all, mock the email
   if (!smtpHost && !smtpUser && !smtpPass && !brevoApiKey) {
@@ -111,8 +111,11 @@ export async function sendOtpEmail(email: string, otpCode: string) {
   console.log(`   SMTP_HOST: ${smtpHost || "(not set)"}`);
   console.log(`   SMTP_PORT: ${smtpPort || "(not set)"}`);
   console.log(`   SMTP_USER: ${smtpUser ? smtpUser.substring(0, 5) + "..." : "(not set)"}`);
+  console.log(`   SMTP_PASS: ${smtpPass ? "set (" + smtpPass.length + " chars)" : "(not set)"}`);
   console.log(`   SMTP_FROM: ${smtpFrom || "(not set)"}`);
   console.log(`   BREVO_API_KEY: ${brevoApiKey ? "set (" + brevoApiKey.substring(0, 8) + "...)" : "(not set)"}`);
+
+  const errors: string[] = [];
 
   // Strategy 1: Try Brevo HTTP API first (most reliable on serverless)
   if (brevoApiKey && smtpFrom) {
@@ -120,8 +123,10 @@ export async function sendOtpEmail(email: string, otpCode: string) {
       return await sendViaBrevoApi(email, smtpFrom, otpCode, brevoApiKey);
     } catch (err: any) {
       console.error("❌ Brevo HTTP API failed:", err.message);
-      // Fall through to SMTP
+      errors.push(`Brevo API: ${err.message}`);
     }
+  } else {
+    console.log("⏭️ Skipping Brevo API (brevoApiKey:", !!brevoApiKey, "smtpFrom:", !!smtpFrom, ")");
   }
 
   // Strategy 2: Try SMTP
@@ -138,13 +143,21 @@ export async function sendOtpEmail(email: string, otpCode: string) {
       );
     } catch (err: any) {
       console.error("❌ SMTP send failed:", err.message);
-      console.error("   Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-      throw new Error(`Email sending failed: ${err.message}`);
+      errors.push(`SMTP: ${err.message}`);
     }
+  } else {
+    const missing = [];
+    if (!smtpHost) missing.push("SMTP_HOST");
+    if (!smtpUser) missing.push("SMTP_USER");
+    if (!smtpPass) missing.push("SMTP_PASS");
+    if (!smtpFrom) missing.push("SMTP_FROM");
+    console.log("⏭️ Skipping SMTP (missing:", missing.join(", "), ")");
+    errors.push(`SMTP missing: ${missing.join(", ")}`);
   }
 
   throw new Error(
-    "Email configuration incomplete. Set SMTP_HOST/SMTP_USER/SMTP_PASS or BREVO_API_KEY."
+    errors.length > 0
+      ? `Email sending failed: ${errors.join(" | ")}`
+      : "Email configuration incomplete. Set SMTP_HOST/SMTP_USER/SMTP_PASS or BREVO_API_KEY."
   );
 }
-
