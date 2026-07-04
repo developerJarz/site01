@@ -8,6 +8,9 @@ import mongoose from "mongoose";
 function cleanMongoUri(uri: string): string {
   if (!uri) return uri;
 
+  // Trim the entire URI first (Netlify env vars can have stray whitespace)
+  uri = uri.trim();
+
   // Find the query string portion
   const qIndex = uri.indexOf("?");
   if (qIndex === -1) return uri;
@@ -15,12 +18,12 @@ function cleanMongoUri(uri: string): string {
   const base = uri.substring(0, qIndex);
   const queryString = uri.substring(qIndex + 1);
 
-  // Parse and filter query params
+  // Parse and filter query params (trim keys to handle stray whitespace)
   const unsupported = ["retrywrites", "w", "appname"];
   const params = queryString
     .split("&")
     .filter((param) => {
-      const key = param.split("=")[0].toLowerCase();
+      const key = param.split("=")[0].trim().toLowerCase();
       return !unsupported.includes(key);
     });
 
