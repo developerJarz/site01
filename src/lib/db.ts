@@ -1,29 +1,32 @@
 import mongoose from "mongoose";
 
-const RAW_MONGODB_URI = process.env.MONGODB_URI || "";
-
 /**
  * Strip query parameters that Mongoose 9 does not support
  * (retryWrites, w, appName are MongoDB driver options, not Mongoose options).
+ * Uses regex so it works even if the URL constructor doesn't handle mongodb+srv://.
  */
 function cleanMongoUri(uri: string): string {
-  try {
-    const url = new URL(uri);
-    // Remove params that Mongoose 9 rejects
-    const unsupported = ["retrywrites", "w", "appname"];
-    for (const key of [...url.searchParams.keys()]) {
-      if (unsupported.includes(key.toLowerCase())) {
-        url.searchParams.delete(key);
-      }
-    }
-    return url.toString();
-  } catch {
-    // If URL parsing fails, return as-is and let Mongoose handle it
-    return uri;
-  }
-}
+  if (!uri) return uri;
 
-const MONGODB_URI = cleanMongoUri(RAW_MONGODB_URI);
+  // Find the query string portion
+  const qIndex = uri.indexOf("?");
+  if (qIndex === -1) return uri;
+
+  const base = uri.substring(0, qIndex);
+  const queryString = uri.substring(qIndex + 1);
+
+  // Parse and filter query params
+  const unsupported = ["retrywrites", "w", "appname"];
+  const params = queryString
+    .split("&")
+    .filter((param) => {
+      const key = param.split("=")[0].toLowerCase();
+      return !unsupported.includes(key);
+    });
+
+  if (params.length === 0) return base;
+  return base + "?" + params.join("&");
+}
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -41,6 +44,11 @@ if (!global.mongoose) {
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
+  // Read and clean the URI at runtime (not module load time)
+  // so that Netlify serverless env vars are available
+  const rawUri = process.env.MONGODB_URI || "";
+  const MONGODB_URI = cleanMongoUri(rawUri);
+
   if (!MONGODB_URI) {
     throw new Error(
       "Please define the MONGODB_URI environment variable inside .env"
@@ -57,6 +65,9 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     };
+
+    console.log("🔗 Connecting to MongoDB...");
+    console.log("   URI (cleaned):", MONGODB_URI.replace(/\/\/[^@]+@/, "//***:***@"));
 
     cached.promise = mongoose
       .connect(MONGODB_URI, opts)
@@ -80,3 +91,4 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 
   return cached.conn;
 }
+
