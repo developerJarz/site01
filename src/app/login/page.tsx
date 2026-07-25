@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Car, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Car, CheckCircle2, Loader2, AlertCircle, Shield } from "lucide-react";
 
 export default function LoginPage() {
   return (
@@ -21,6 +21,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [auth0Loading, setAuth0Loading] = useState(false);
   const [registered, setRegistered] = useState(searchParams.get("registered") === "true");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,6 +62,11 @@ function LoginForm() {
     setLoading(false);
   };
 
+  const handleAuth0Login = () => {
+    setAuth0Loading(true);
+    signIn("auth0", { callbackUrl: "/dashboard" });
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl">
@@ -83,6 +89,25 @@ function LoginForm() {
             {error}
           </div>
         )}
+
+        {/* Auth0 Social Login */}
+        <button
+          id="auth0-login-btn"
+          type="button"
+          onClick={handleAuth0Login}
+          disabled={auth0Loading || loading}
+          className="w-full bg-[#EB5424] text-white py-2.5 rounded-lg font-medium hover:bg-[#d44a1f] transition-colors shadow-lg shadow-[#EB5424]/20 disabled:opacity-50 flex items-center justify-center gap-2 mb-4"
+        >
+          {auth0Loading ? <Loader2 size={18} className="animate-spin" /> : <Shield size={18} />}
+          {auth0Loading ? "Redirecting..." : "Continue with Auth0"}
+        </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">or sign in with email</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -116,7 +141,7 @@ function LoginForm() {
 
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || auth0Loading}
             className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
@@ -134,3 +159,4 @@ function LoginForm() {
     </div>
   );
 }
+
