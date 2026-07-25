@@ -1,4 +1,5 @@
-import { NextAuthOptions, Provider } from "next-auth";
+import { NextAuthOptions } from "next-auth";
+import type { Provider } from "next-auth/providers/index";
 import CredentialsProvider from "next-auth/providers/credentials";
 import Auth0Provider from "next-auth/providers/auth0";
 import bcrypt from "bcryptjs";
