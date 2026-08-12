@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { Filter, SlidersHorizontal, MapPin, Search, Loader2 } from "lucide-react";
+import { Filter, MapPin, Search, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import axios from "axios";
 
@@ -21,6 +21,9 @@ function CarsContent() {
 
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Track whether initial fetch has happened to prevent double-fetch
+  const hasFetched = useRef(false);
 
   // Filter states initialized from URL
   const [q, setQ] = useState(searchParams.get("q") || "");
@@ -56,19 +59,26 @@ function CarsContent() {
     }
   };
 
-  // Fetch when filters change (debounced for text/number inputs)
+  // Initial fetch on mount
   useEffect(() => {
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchListings();
+    }
+  }, []);
+
+  // Debounced text/number inputs
+  useEffect(() => {
+    if (!hasFetched.current) return;
     const delayDebounceFn = setTimeout(() => {
       fetchListings();
     }, 500);
-
     return () => clearTimeout(delayDebounceFn);
   }, [q, minPrice, maxPrice]);
 
-  // Fetch immediately on select changes
+  // Immediate fetch on select changes
   useEffect(() => {
-    // Only fetch if it's not the initial mount to prevent double fetch, 
-    // but we can just let it fetch as the debounced effect will also run.
+    if (!hasFetched.current) return;
     fetchListings();
   }, [make, condition, fuelType, transmission]);
 
@@ -81,6 +91,12 @@ function CarsContent() {
     setMinPrice("");
     setMaxPrice("");
     router.push(pathname);
+  };
+
+  const getConditionBadge = (cond: string) => {
+    if (cond === "new") return "badge-new";
+    if (cond === "reconditioned") return "badge-reconditioned";
+    return "badge-used";
   };
 
   return (
@@ -124,7 +140,7 @@ function CarsContent() {
                 </div>
               </div>
 
-              {/* Make/Brand */}
+              {/* Make/Brand — all brands from seed data + common ones */}
               <div>
                 <label className="block text-sm font-medium mb-2">Make / Brand</label>
                 <select
@@ -133,12 +149,19 @@ function CarsContent() {
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="">All Brands</option>
-                  <option value="Toyota">Toyota</option>
-                  <option value="Honda">Honda</option>
-                  <option value="Nissan">Nissan</option>
-                  <option value="Hyundai">Hyundai</option>
+                  <option value="Audi">Audi</option>
                   <option value="BMW">BMW</option>
+                  <option value="Honda">Honda</option>
+                  <option value="Hyundai">Hyundai</option>
+                  <option value="Kia">Kia</option>
+                  <option value="Lexus">Lexus</option>
+                  <option value="Mazda">Mazda</option>
                   <option value="Mercedes-Benz">Mercedes-Benz</option>
+                  <option value="Mitsubishi">Mitsubishi</option>
+                  <option value="Nissan">Nissan</option>
+                  <option value="Suzuki">Suzuki</option>
+                  <option value="Toyota">Toyota</option>
+                  <option value="Volkswagen">Volkswagen</option>
                 </select>
               </div>
 
@@ -243,7 +266,7 @@ function CarsContent() {
               {listings.map((car: any) => (
                 <div
                   key={car._id}
-                  className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-all group flex flex-col"
+                  className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-all group flex flex-col card-hover"
                 >
                   <Link href={`/cars/${car.slug}`}>
                     <div className="relative h-48 overflow-hidden bg-muted">
@@ -254,12 +277,14 @@ function CarsContent() {
                         }}
                       />
                       {car.featured && (
-                        <div className="absolute top-2 left-2 bg-primary text-white text-xs font-bold px-2 py-1 rounded">
+                        <div className="absolute top-2 left-2 bg-primary text-white text-xs font-bold px-2 py-1 rounded shadow-lg shadow-primary/30">
                           FEATURED
                         </div>
                       )}
-                      <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded capitalize">
-                        {car.condition}
+                      <div className="absolute top-2 right-2">
+                        <span className={`${getConditionBadge(car.condition)} text-xs font-bold px-2.5 py-1 rounded-full capitalize backdrop-blur-sm`}>
+                          {car.condition}
+                        </span>
                       </div>
                     </div>
                   </Link>
@@ -269,19 +294,19 @@ function CarsContent() {
                         {car.title}
                       </h3>
                     </Link>
-                    <p className="text-xl font-bold text-primary mb-4">
-                      ৳ {car.price?.toLocaleString()}
+                    <p className="price-tag text-xl text-primary mb-4">
+                      ৳ {car.price?.toLocaleString("en-IN")}
                     </p>
                     <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground mb-4">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-gray-400" />
                         {car.mileage?.toLocaleString()} km
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 capitalize">
                         <span className="w-2 h-2 rounded-full bg-gray-400" />
                         {car.transmission}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 capitalize">
                         <span className="w-2 h-2 rounded-full bg-gray-400" />
                         {car.fuelType}
                       </span>

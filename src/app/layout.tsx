@@ -16,8 +16,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CarHat.bd - Modern Car Marketplace",
-  description: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
+  title: {
+    default: "CarHat.bd — Modern Car Marketplace in Bangladesh",
+    template: "%s | CarHat.bd",
+  },
+  description:
+    "The premier destination to buy, sell, and explore the best cars in Bangladesh. Find new, used, and reconditioned vehicles from verified dealers and private sellers.",
+  keywords: [
+    "car marketplace Bangladesh",
+    "buy car Dhaka",
+    "sell car online BD",
+    "used cars Bangladesh",
+    "reconditioned cars",
+    "CarHat",
+  ],
+  metadataBase: new URL(process.env.APP_BASE_URL || "http://localhost:3000"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "CarHat.bd",
+    title: "CarHat.bd — Modern Car Marketplace in Bangladesh",
+    description:
+      "Buy, sell, and explore the best cars in Bangladesh. Verified dealers, secure transactions.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

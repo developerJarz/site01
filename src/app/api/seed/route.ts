@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import { User } from "@/lib/models/User";
 import { Listing } from "@/lib/models/Listing";
+import { SiteSettings } from "@/lib/models/SiteSettings";
 
 const DEMO_CARS = [
   {
@@ -243,6 +244,109 @@ const DEMO_CARS = [
     views: 334,
     features: ["R-Line", "4Motion AWD", "Digital Cockpit Pro", "Harman Kardon", "IQ.LIGHT Matrix LED"],
   },
+  // === 6 NEW CARS ===
+  {
+    make: "Toyota",
+    model: "Camry Hybrid",
+    year: 2023,
+    price: 5600000,
+    mileage: 15000,
+    condition: "used",
+    fuelType: "hybrid",
+    transmission: "automatic",
+    engineSize: 2500,
+    color: "Midnight Black",
+    location: "Gulshan, Dhaka",
+    description: "Toyota Camry Hybrid Premium. Dual-zone climate, 9-inch touchscreen, JBL premium audio, wireless CarPlay, Toyota Safety Sense 2.5. Exceptional fuel economy with sedan comfort.",
+    images: ["https://images.unsplash.com/photo-1621993202323-f6b1cf09d79a?auto=format&fit=crop&q=80&w=1200"],
+    views: 278,
+    features: ["Hybrid Synergy Drive", "JBL Audio", "Wireless CarPlay", "Safety Sense 2.5", "Leather Interior"],
+  },
+  {
+    make: "Honda",
+    model: "HR-V e:HEV",
+    year: 2024,
+    price: 3900000,
+    mileage: 4000,
+    condition: "reconditioned",
+    fuelType: "hybrid",
+    transmission: "automatic",
+    engineSize: 1500,
+    color: "Crystal Blue",
+    location: "Banani, Dhaka",
+    description: "Honda HR-V e:HEV — stylish crossover with Honda's latest hybrid system. Real-time AWD, Honda CONNECT, wireless charging, panoramic sunroof. Zero accident, first owner.",
+    images: ["https://images.unsplash.com/photo-1568844293986-8616ae7e37af?auto=format&fit=crop&q=80&w=1200"],
+    views: 156,
+    features: ["e:HEV Hybrid", "Real-Time AWD", "Honda CONNECT", "Wireless Charging", "Panoramic Sunroof"],
+  },
+  {
+    make: "BMW",
+    model: "X3 xDrive30i",
+    year: 2023,
+    price: 8500000,
+    mileage: 10000,
+    condition: "used",
+    fuelType: "petrol",
+    transmission: "automatic",
+    engineSize: 2000,
+    color: "Phytonic Blue",
+    location: "Baridhara, Dhaka",
+    description: "BMW X3 xDrive30i M Sport. Panoramic glass roof, Vernasca leather, live cockpit professional, parking assistant plus, driving assistant professional. Showroom condition.",
+    images: ["https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200"],
+    views: 412,
+    features: ["M Sport", "xDrive AWD", "Panoramic Roof", "Vernasca Leather", "Driving Assistant Pro"],
+  },
+  {
+    make: "Hyundai",
+    model: "Creta SX(O)",
+    year: 2024,
+    price: 2800000,
+    mileage: 5000,
+    condition: "new",
+    fuelType: "petrol",
+    transmission: "automatic",
+    engineSize: 1500,
+    color: "Atlas White",
+    location: "Chittagong",
+    description: "Hyundai Creta SX(O) — top variant with all features! ADAS Level 2, Bose premium audio, ventilated seats, 360 camera, electric sunroof, dual-zone climate. Best-selling compact SUV.",
+    images: ["https://images.unsplash.com/photo-1619976215249-0bcdaa5b8b1d?auto=format&fit=crop&q=80&w=1200"],
+    views: 543,
+    features: ["ADAS Level 2", "Bose Audio", "Ventilated Seats", "360 Camera", "Electric Sunroof", "Connected Car"],
+  },
+  {
+    make: "Mercedes-Benz",
+    model: "GLA 200 AMG",
+    year: 2022,
+    price: 6800000,
+    mileage: 20000,
+    condition: "used",
+    fuelType: "petrol",
+    transmission: "automatic",
+    engineSize: 1300,
+    color: "Cosmos Black",
+    location: "Dhanmondi, Dhaka",
+    description: "Mercedes GLA 200 AMG Line — the sporty compact SUV. MBUX infotainment with voice control, augmented reality navigation, multibeam LED headlights, heated seats. Full service history.",
+    images: ["https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=1200"],
+    views: 387,
+    features: ["AMG Line", "MBUX Voice Control", "AR Navigation", "Multibeam LED", "Heated Seats"],
+  },
+  {
+    make: "Kia",
+    model: "Seltos X-Line",
+    year: 2023,
+    price: 2500000,
+    mileage: 15000,
+    condition: "used",
+    fuelType: "petrol",
+    transmission: "automatic",
+    engineSize: 1500,
+    color: "Matte Grey",
+    location: "Sylhet",
+    description: "Kia Seltos X-Line — rugged styling with premium features. Bose audio, 360 camera surround view, ventilated seats, 10.25\" touchscreen, UVO connected car, sunroof.",
+    images: ["https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=1200"],
+    views: 298,
+    features: ["X-Line Package", "Bose Audio", "360 Camera", "Ventilated Seats", "UVO Connect", "Sunroof"],
+  },
 ];
 
 export async function GET() {
@@ -259,6 +363,14 @@ export async function GET() {
       email: "dealer@carhat.bd",
       password: hashedPassword,
       role: "dealer",
+      isVerified: true,
+      phone: "+880 1712-345678",
+      whatsappNumber: "+880 1712-345678",
+      allowPhoneDisplay: true,
+      allowWhatsApp: true,
+      bio: "Leading car dealership in Dhaka since 2015. Specializing in reconditioned imports and luxury vehicles.",
+      city: "Dhaka",
+      dealershipName: "Auto Traders BD",
     });
 
     const dealer2 = await User.create({
@@ -266,6 +378,14 @@ export async function GET() {
       email: "premium@carhat.bd",
       password: hashedPassword,
       role: "dealer",
+      isVerified: true,
+      phone: "+880 1812-456789",
+      whatsappNumber: "+880 1812-456789",
+      allowPhoneDisplay: true,
+      allowWhatsApp: true,
+      bio: "Premium & luxury car dealer — BMW, Mercedes, Audi. Authorized pre-owned specialists.",
+      city: "Dhaka",
+      dealershipName: "Premium Motors Dhaka",
     });
 
     const privateSeller = await User.create({
@@ -273,6 +393,13 @@ export async function GET() {
       email: "rahim@carhat.bd",
       password: hashedPassword,
       role: "seller",
+      isVerified: true,
+      phone: "+880 1912-567890",
+      whatsappNumber: "+880 1912-567890",
+      allowPhoneDisplay: true,
+      allowWhatsApp: true,
+      bio: "Car enthusiast selling from personal collection.",
+      city: "Dhaka",
     });
 
     // Admin account
@@ -282,6 +409,19 @@ export async function GET() {
       password: hashedPassword,
       role: "admin",
       isVerified: true,
+      phone: "+880 1700-000000",
+    });
+
+    // Buyer test account
+    await User.create({
+      name: "Tanvir Hasan",
+      email: "buyer@carhat.bd",
+      password: hashedPassword,
+      role: "buyer",
+      isVerified: true,
+      phone: "+880 1612-789012",
+      bio: "Looking for a reliable family car.",
+      city: "Dhaka",
     });
 
     const sellers = [dealer1, dealer2, privateSeller];
@@ -301,14 +441,27 @@ export async function GET() {
 
     await Listing.insertMany(formattedListings);
 
+    // Initialize site settings
+    await SiteSettings.deleteMany({});
+    await SiteSettings.create({
+      siteName: "CarHat.bd",
+      tagline: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
+      contactEmail: "support@carhat.bd",
+      supportPhone: "+880 1700-000000",
+      defaultListingStatus: "pending",
+      autoApproveListings: false,
+      maxImagesPerListing: 10,
+    });
+
     return NextResponse.json({
       success: true,
-      message: `Database seeded with ${DEMO_CARS.length} premium cars and 4 accounts.`,
+      message: `Database seeded with ${DEMO_CARS.length} premium cars and 5 accounts.`,
       testAccounts: [
         { email: "admin@carhat.bd", password: "password123", role: "admin" },
         { email: "dealer@carhat.bd", password: "password123", role: "dealer" },
         { email: "premium@carhat.bd", password: "password123", role: "dealer" },
         { email: "rahim@carhat.bd", password: "password123", role: "seller" },
+        { email: "buyer@carhat.bd", password: "password123", role: "buyer" },
       ],
     });
   } catch (error: any) {

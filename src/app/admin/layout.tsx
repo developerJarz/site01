@@ -9,6 +9,8 @@ import {
   ArrowLeft,
   Shield,
   BookOpen,
+  Settings,
+  BarChart3,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -16,6 +18,8 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/listings", label: "Listings", icon: Car },
   { href: "/admin/blogs", label: "Blogs", icon: BookOpen },
+  { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AdminLayout({
@@ -83,11 +87,11 @@ export default function AdminLayout({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                 isActive ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <item.icon size={20} />
+              <item.icon size={18} />
               {item.label}
             </Link>
           );
