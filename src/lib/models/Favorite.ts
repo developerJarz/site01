@@ -1,4 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import "./User";
+import "./Listing";
 
 export interface IFavorite extends Document {
   userId: mongoose.Types.ObjectId;

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
+import { User } from "@/lib/models/User";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -26,14 +27,26 @@ import {
 import { SellerContactCard } from "@/components/SellerContactCard";
 import type { Metadata } from "next";
 
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // Generate dynamic metadata for SEO
 export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await props.params;
+  const decodedSlug = decodeURIComponent(slug || "");
+  const escaped = escapeRegex(decodedSlug);
   try {
     await connectToDatabase();
-    const car = (await Listing.findOne({ slug }).lean()) as any;
+    const car = (await Listing.findOne({
+      $or: [
+        { slug: decodedSlug },
+        { slug: slug },
+        { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
+      ],
+    }).lean()) as any;
     if (car) {
       return {
         title: `${car.title} — ৳${car.price?.toLocaleString()} | CarHat.bd`,
@@ -53,14 +66,29 @@ export default async function CarDetailsPage(props: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await props.params;
+  const decodedSlug = decodeURIComponent(slug || "");
+  const escaped = escapeRegex(decodedSlug);
+
+  const query = {
+    $or: [
+      { slug: decodedSlug },
+      { slug: slug },
+      { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
+    ],
+  };
 
   let car: any = null;
   let relatedCars: any[] = [];
   try {
     await connectToDatabase();
-    car = (await Listing.findOne({ slug })
-      .populate("sellerId", "name phone email role")
-      .lean()) as any;
+    try {
+      car = (await Listing.findOne(query)
+        .populate("sellerId", "name phone email role")
+        .lean()) as any;
+    } catch (popError) {
+      console.error("Populate error, falling back to basic query:", popError);
+      car = (await Listing.findOne(query).lean()) as any;
+    }
 
     // Fetch related cars (same make, exclude current)
     if (car) {

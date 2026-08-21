@@ -36,7 +36,7 @@ export async function PATCH(req: Request) {
     const settings = await SiteSettings.findOneAndUpdate(
       {},
       { $set: body },
-      { new: true, upsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
 
     return NextResponse.json({

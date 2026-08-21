@@ -1,14 +1,22 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Car, CheckCircle2, Loader2, AlertCircle, Shield } from "lucide-react";
+import Image from "next/image";
+import { CheckCircle2, Loader2, AlertCircle, Shield } from "lucide-react";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-[calc(100vh-4rem)] flex items-center justify-center"><Loader2 size={32} className="animate-spin text-primary" /></div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+          <Loader2 size={32} className="animate-spin text-primary" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );
@@ -17,6 +25,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { settings } = useSiteSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,7 +46,6 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        // NextAuth v4 wraps authorize errors — map them properly
         const errorMsg = res.error;
         const messages: Record<string, string> = {
           "Invalid credentials": "Please enter your email and password.",
@@ -67,13 +75,25 @@ function LoginForm() {
     signIn("auth0", { callbackUrl: "/dashboard" });
   };
 
+  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl">
         <div className="flex flex-col items-center mb-8">
-          <Car className="h-12 w-12 text-primary mb-2" />
+          <Link href="/" className="mb-4 group">
+            <div className="relative h-12 flex items-center">
+              <Image
+                src={logoSrc}
+                alt={settings.siteName || "CarHat.bd"}
+                width={160}
+                height={44}
+                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+            </div>
+          </Link>
           <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground text-sm">Sign in to your CarHat.bd account</p>
+          <p className="text-muted-foreground text-sm">Sign in to your {settings.siteName || "CarHat.bd"} account</p>
         </div>
 
         {registered && (
@@ -112,8 +132,8 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -123,8 +143,8 @@ function LoginForm() {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -132,15 +152,15 @@ function LoginForm() {
               placeholder="••••••••"
             />
           </div>
-          
+
           <div className="flex justify-end">
             <Link href="/forgot-password" className="text-sm text-primary hover:underline">
               Forgot password?
             </Link>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading || auth0Loading}
             className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
@@ -150,7 +170,7 @@ function LoginForm() {
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register" className="text-primary hover:underline font-medium">
             Create one
           </Link>
@@ -159,4 +179,3 @@ function LoginForm() {
     </div>
   );
 }
-

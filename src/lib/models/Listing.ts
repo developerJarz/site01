@@ -1,4 +1,5 @@
 import mongoose, { Schema, Model } from "mongoose";
+import "./User";
 
 export interface IListing {
   title: string;

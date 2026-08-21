@@ -1,4 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import "./User";
+import "./Listing";
 
 export interface IConversation extends Document {
   buyer: mongoose.Types.ObjectId;

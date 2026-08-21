@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Car, MessageSquare, Sparkles, PlusCircle, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Menu, X, MessageSquare, Sparkles, PlusCircle, LayoutDashboard, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 const NAV_LINKS = [
   { href: "/cars", label: "Buy Car" },
@@ -19,6 +21,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { data: session } = useSession();
+  const { settings } = useSiteSettings();
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
 
@@ -39,17 +42,19 @@ export function Navbar() {
     const fetchUnread = async () => {
       try {
         const res = await fetch("/api/conversations/unread");
-        const data = await res.json();
-        if (data.unreadCount !== undefined) {
-          setUnreadCount(data.unreadCount);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.unreadCount !== undefined) {
+            setUnreadCount(data.unreadCount);
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch unread count", error);
+        console.warn("Failed to fetch unread count", error);
       }
     };
 
     fetchUnread();
-    const interval = setInterval(fetchUnread, 5000);
+    const interval = setInterval(fetchUnread, 10000);
     return () => clearInterval(interval);
   }, [session]);
 
@@ -65,39 +70,47 @@ export function Navbar() {
     };
   }, [isOpen]);
 
+  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
+
   return (
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? "bg-background/90 backdrop-blur-xl border-b border-border/80 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)]"
-            : "bg-background/80 backdrop-blur-lg border-b border-border/40"
+            ? "bg-background/95 backdrop-blur-xl shadow-sm"
+            : "bg-background/90 backdrop-blur-lg"
         }`}
       >
-        {/* Subtle top accent gradient line */}
-        <div className="h-[2px] w-full bg-gradient-to-r from-primary/30 via-primary to-purple-500/40" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* ──── Brand Logo ──── */}
             <Link
               href="/"
-              className="flex items-center gap-2.5 group select-none"
+              className="flex items-center gap-2.5 group select-none py-1"
               onClick={() => setIsOpen(false)}
             >
-              <div className="relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-primary/25 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative w-10 h-10 bg-gradient-to-br from-primary via-primary to-purple-600 rounded-xl flex items-center justify-center shadow-md shadow-primary/25 group-hover:scale-105 transition-transform duration-200">
-                  <Car className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-black tracking-tight text-foreground flex items-center">
-                  Car<span className="gradient-text ml-0.5">Hat</span>
-                  <span className="text-xs font-bold text-muted-foreground ml-1 px-1.5 py-0.5 bg-muted rounded-md uppercase tracking-wider">
+              <div className="relative flex items-center h-10">
+                <Image
+                  src={logoSrc}
+                  alt={settings.siteName || "CarHat.bd"}
+                  width={150}
+                  height={40}
+                  priority
+                  className="h-9 md:h-10 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+                  onError={(e) => {
+                    // Fallback to text if image error occurs
+                    e.currentTarget.style.display = "none";
+                    const fallback = e.currentTarget.parentElement?.querySelector(".logo-fallback") as HTMLElement;
+                    if (fallback) fallback.style.display = "flex";
+                  }}
+                />
+                <div className="logo-fallback hidden items-center gap-1.5 font-black text-xl tracking-tight text-foreground">
+                  <span>Car<span className="gradient-text">Hat</span></span>
+                  <span className="text-xs font-bold text-muted-foreground ml-0.5 px-1.5 py-0.5 bg-muted rounded-md uppercase">
                     BD
                   </span>
-                </span>
+                </div>
               </div>
             </Link>
 
@@ -133,7 +146,7 @@ export function Navbar() {
 
             {/* ──── Right Action Buttons ──── */}
             <div className="hidden md:flex items-center gap-3">
-              {/* Quick "Sell Car" button for high conversion */}
+              {/* Quick "Sell Car" button */}
               <Link
                 href="/sell"
                 className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-200"
@@ -238,12 +251,13 @@ export function Navbar() {
               {/* Drawer Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center text-white shadow-sm">
-                    <Car size={16} />
-                  </div>
-                  <span className="font-extrabold text-foreground tracking-tight">
-                    Car<span className="gradient-text">Hat</span>.bd
-                  </span>
+                  <Image
+                    src={logoSrc}
+                    alt={settings.siteName || "CarHat.bd"}
+                    width={130}
+                    height={36}
+                    className="h-8 w-auto object-contain"
+                  />
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}

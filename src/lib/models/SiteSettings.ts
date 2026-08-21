@@ -5,6 +5,19 @@ export interface ISiteSettings {
   tagline: string;
   contactEmail: string;
   supportPhone: string;
+  address: string;
+  workingHours: string;
+  logoUrl: string;
+  socialLinks: {
+    facebook: string;
+    twitter: string;
+    instagram: string;
+    youtube: string;
+    linkedin: string;
+    whatsapp: string;
+  };
+  googleMapsUrl: string;
+  copyrightText: string;
   defaultListingStatus: "active" | "pending";
   autoApproveListings: boolean;
   maxImagesPerListing: number;
@@ -23,7 +36,32 @@ const SiteSettingsSchema: Schema<ISiteSettings> = new Schema(
       default: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
     },
     contactEmail: { type: String, default: "support@carhat.bd" },
-    supportPhone: { type: String, default: "+880 1234-567890" },
+    supportPhone: { type: String, default: "+880 1700-000000" },
+    address: {
+      type: String,
+      default: "Plot 12, Road 11, Block C, Gulshan-2, Dhaka 1212, Bangladesh",
+    },
+    workingHours: {
+      type: String,
+      default: "Sat - Thu: 9:00 AM - 8:00 PM (Friday Closed)",
+    },
+    logoUrl: { type: String, default: "/car-hat-bd.png" },
+    socialLinks: {
+      facebook: { type: String, default: "https://facebook.com" },
+      twitter: { type: String, default: "https://twitter.com" },
+      instagram: { type: String, default: "https://instagram.com" },
+      youtube: { type: String, default: "https://youtube.com" },
+      linkedin: { type: String, default: "https://linkedin.com" },
+      whatsapp: { type: String, default: "+8801700000000" },
+    },
+    googleMapsUrl: {
+      type: String,
+      default: "https://maps.google.com/?q=Gulshan-2,Dhaka,Bangladesh",
+    },
+    copyrightText: {
+      type: String,
+      default: "CarHat.bd. All rights reserved.",
+    },
     defaultListingStatus: {
       type: String,
       enum: ["active", "pending"],
@@ -37,7 +75,8 @@ const SiteSettingsSchema: Schema<ISiteSettings> = new Schema(
     },
     metaDescription: {
       type: String,
-      default: "Buy, sell, and explore the best cars in Bangladesh on CarHat.bd. Find your perfect car with verified dealers and private sellers.",
+      default:
+        "Buy, sell, and explore the best cars in Bangladesh on CarHat.bd. Find your perfect car with verified dealers and private sellers.",
     },
     maintenanceMode: { type: Boolean, default: false },
     maintenanceMessage: {

@@ -15,9 +15,6 @@ const OtpSchema: Schema<IOtp> = new Schema(
   { timestamps: true }
 );
 
-// Ensure hot reload in development doesn't cause issues
-if (mongoose.models.Otp) {
-  delete mongoose.models.Otp;
-}
+export const Otp: Model<IOtp> =
+  mongoose.models.Otp || mongoose.model<IOtp>("Otp", OtpSchema);
 
-export const Otp: Model<IOtp> = mongoose.model<IOtp>("Otp", OtpSchema);

@@ -13,16 +13,29 @@ import {
   Share2,
 } from "lucide-react";
 
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export default async function BlogPostPage(props: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await props.params;
+  const decodedSlug = decodeURIComponent(slug || "");
+  const escaped = escapeRegex(decodedSlug);
 
   let blog: any = null;
   let related: any[] = [];
   try {
     await connectToDatabase();
-    blog = (await Blog.findOne({ slug, published: true }).lean()) as any;
+    blog = (await Blog.findOne({
+      $or: [
+        { slug: decodedSlug },
+        { slug: slug },
+        { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
+      ],
+      published: true,
+    }).lean()) as any;
 
     if (blog) {
       // Increment view count

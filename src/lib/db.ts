@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+// Pre-register all models to ensure Mongoose population works across all serverless functions
+import "@/lib/models/User";
+import "@/lib/models/Listing";
+import "@/lib/models/Conversation";
+import "@/lib/models/Message";
+import "@/lib/models/Favorite";
+import "@/lib/models/Review";
+import "@/lib/models/Subscription";
+import "@/lib/models/Blog";
+import "@/lib/models/SiteSettings";
+import "@/lib/models/Otp";
+
 /**
  * Strip query parameters that Mongoose 9 does not support
  * (retryWrites, w, appName are MongoDB driver options, not Mongoose options).

@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Car, Mail, KeyRound, Lock, ArrowLeft, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Mail, KeyRound, Lock, ArrowLeft, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 type Step = "email" | "reset" | "done";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { settings } = useSiteSettings();
   const [step, setStep] = useState<Step>("email");
 
   // Step 1 — email
@@ -87,13 +90,24 @@ export default function ForgotPasswordPage() {
     setResetLoading(false);
   };
 
+  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl">
-
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
-          <Car className="h-12 w-12 text-primary mb-2" />
+          <Link href="/" className="mb-4 group">
+            <div className="relative h-12 flex items-center">
+              <Image
+                src={logoSrc}
+                alt={settings.siteName || "CarHat.bd"}
+                width={160}
+                height={44}
+                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+            </div>
+          </Link>
           <h1 className="text-2xl font-bold text-foreground">
             {step === "email" && "Forgot Password"}
             {step === "reset" && "Reset Password"}
@@ -224,7 +238,10 @@ export default function ForgotPasswordPage() {
 
             <button
               type="button"
-              onClick={() => { setStep("email"); setResetError(""); }}
+              onClick={() => {
+                setStep("email");
+                setResetError("");
+              }}
               className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1 mt-1"
             >
               <ArrowLeft size={14} />

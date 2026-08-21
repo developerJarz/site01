@@ -45,9 +45,6 @@ const UserSchema: Schema<IUser> = new Schema(
   { timestamps: true }
 );
 
-// Force recompile during development hot-reloads
-if (mongoose.models.User) {
-  delete mongoose.models.User;
-}
+export const User: Model<IUser> =
+  mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
 
-export const User: Model<IUser> = mongoose.model<IUser>("User", UserSchema);

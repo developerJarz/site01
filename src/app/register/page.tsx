@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Car, Mail } from "lucide-react";
+import Image from "next/image";
+import { Mail } from "lucide-react";
 import axios from "axios";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { settings } = useSiteSettings();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: "",
@@ -18,7 +21,7 @@ export default function RegisterPage() {
   const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   // 5-minute countdown (300 seconds)
   const [timeLeft, setTimeLeft] = useState(300);
 
@@ -40,7 +43,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    
+
     try {
       const res = await axios.post("/api/auth/register", formData);
       if (res.data.requiresOtp) {
@@ -57,7 +60,7 @@ export default function RegisterPage() {
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
+
     if (timeLeft <= 0) {
       setError("OTP has expired. Please refresh and try again.");
       return;
@@ -77,21 +80,29 @@ export default function RegisterPage() {
     }
   };
 
+  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl">
         <div className="flex flex-col items-center mb-8">
-          {step === 1 ? (
-            <Car className="h-12 w-12 text-primary mb-2" />
-          ) : (
-            <Mail className="h-12 w-12 text-primary mb-2" />
-          )}
+          <Link href="/" className="mb-4 group">
+            <div className="relative h-12 flex items-center">
+              <Image
+                src={logoSrc}
+                alt={settings.siteName || "CarHat.bd"}
+                width={160}
+                height={44}
+                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+            </div>
+          </Link>
           <h1 className="text-2xl font-bold text-foreground">
             {step === 1 ? "Create Account" : "Verify Email"}
           </h1>
           <p className="text-muted-foreground text-sm text-center">
-            {step === 1 
-              ? "Join CarHat.bd today" 
+            {step === 1
+              ? `Join ${settings.siteName || "CarHat.bd"} today`
               : `We sent a 6-digit code to ${formData.email}. Please enter it below.`}
           </p>
         </div>
@@ -106,42 +117,42 @@ export default function RegisterPage() {
           <form onSubmit={handleRegisterSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="John Doe"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-              <input 
-                type="email" 
+              <input
+                type="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="you@example.com"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 required
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="••••••••"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">I want to</label>
-              <select 
+              <select
                 value={formData.role}
-                onChange={(e) => setFormData({...formData, role: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="buyer">Buy Cars</option>
@@ -149,9 +160,9 @@ export default function RegisterPage() {
                 <option value="dealer">Become a Dealer</option>
               </select>
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading}
               className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 mt-2"
             >
@@ -163,24 +174,24 @@ export default function RegisterPage() {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium text-foreground">6-Digit Code</label>
-                <span className={`text-xs font-bold ${timeLeft < 60 ? 'text-red-500' : 'text-primary'}`}>
+                <span className={`text-xs font-bold ${timeLeft < 60 ? "text-red-500" : "text-primary"}`}>
                   {formatTime(timeLeft)}
                 </span>
               </div>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 required
                 maxLength={6}
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                 className="w-full px-4 py-3 text-center tracking-[1em] text-2xl bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                 placeholder="••••••"
                 disabled={timeLeft <= 0}
               />
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading || timeLeft <= 0 || otpCode.length !== 6}
               className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 mt-2"
             >
@@ -188,9 +199,12 @@ export default function RegisterPage() {
             </button>
 
             {timeLeft <= 0 && (
-              <button 
+              <button
                 type="button"
-                onClick={() => { setStep(1); setOtpCode(""); }}
+                onClick={() => {
+                  setStep(1);
+                  setOtpCode("");
+                }}
                 className="w-full bg-muted text-muted-foreground py-2.5 rounded-lg font-medium hover:bg-muted/80 transition-colors mt-2"
               >
                 Go Back & Try Again
