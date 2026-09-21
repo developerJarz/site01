@@ -18,6 +18,15 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 // Client-side image compression to ensure fast, reliable uploads on live sites
 async function compressImageFile(file: File, maxDim = 1600, quality = 0.82): Promise<File> {
   if (!file.type.startsWith("image/") || file.type.includes("svg")) {
@@ -188,10 +197,19 @@ export default function SellCarPage() {
         }
 
         setUploadStatusText("Uploading photos...");
-        const fd = new FormData();
-        compressedFiles.forEach((f) => fd.append("files", f));
-        const uploadRes = await axios.post("/api/upload", fd);
-        imageUrls = uploadRes.data.urls || [];
+        try {
+          const fd = new FormData();
+          compressedFiles.forEach((f) => fd.append("files", f));
+          const uploadRes = await axios.post("/api/upload", fd);
+          if (uploadRes.data?.urls && uploadRes.data.urls.length > 0) {
+            imageUrls = uploadRes.data.urls;
+          } else {
+            throw new Error("No image URLs returned");
+          }
+        } catch (uploadErr) {
+          console.warn("Server upload endpoint failed, switching to in-browser encoding:", uploadErr);
+          imageUrls = await Promise.all(compressedFiles.map((f) => fileToDataUrl(f)));
+        }
         setUploadingImages(false);
       }
 
@@ -211,10 +229,19 @@ export default function SellCarPage() {
           }
         }
 
-        const fd = new FormData();
-        compressedDocFiles.forEach((f) => fd.append("files", f));
-        const uploadRes = await axios.post("/api/upload", fd);
-        docUrls = uploadRes.data.urls || [];
+        try {
+          const fd = new FormData();
+          compressedDocFiles.forEach((f) => fd.append("files", f));
+          const uploadRes = await axios.post("/api/upload", fd);
+          if (uploadRes.data?.urls && uploadRes.data.urls.length > 0) {
+            docUrls = uploadRes.data.urls;
+          } else {
+            throw new Error("No doc URLs returned");
+          }
+        } catch (docUploadErr) {
+          console.warn("Doc upload endpoint failed, switching to in-browser encoding:", docUploadErr);
+          docUrls = await Promise.all(compressedDocFiles.map((f) => fileToDataUrl(f)));
+        }
         setUploadingDocs(false);
       }
 
@@ -238,7 +265,7 @@ export default function SellCarPage() {
       setError(
         err.response?.data?.error ||
         err.message ||
-        "Failed to post ad. Please verify your connection and try again."
+        "Failed to post ad. Please check your connection and try again."
       );
     } finally {
       setLoading(false);
