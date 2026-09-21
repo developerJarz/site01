@@ -28,6 +28,7 @@ import {
   BookOpen,
   Users,
   Package,
+  ShieldCheck,
 } from "lucide-react";
 
 interface Listing {
@@ -40,6 +41,8 @@ interface Listing {
   images: string[];
   createdAt: string;
   condition: string;
+  paperVerified?: boolean;
+  hasDocuments?: boolean;
 }
 
 interface DashboardData {
@@ -454,9 +457,20 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-grow min-w-0">
                   <p className="font-medium truncate">{listing.title}</p>
-                  <p className="text-sm text-primary font-bold">
-                    ৳ {listing.price?.toLocaleString()}
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-sm text-primary font-bold">
+                      ৳ {listing.price?.toLocaleString()}
+                    </p>
+                    {listing.paperVerified ? (
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <ShieldCheck size={11} /> Paper Verified
+                      </span>
+                    ) : listing.hasDocuments ? (
+                      <span className="text-[10px] font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Clock size={11} /> Papers Under Review
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -472,6 +486,7 @@ export default function DashboardPage() {
                   <Link
                     href={`/cars/${listing.slug}`}
                     className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                    title="View Listing"
                   >
                     <ExternalLink size={16} />
                   </Link>

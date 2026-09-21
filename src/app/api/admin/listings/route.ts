@@ -22,7 +22,11 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, ...fields } = body;
+    const id = body.id || body._id;
+    if (!id) {
+      return NextResponse.json({ error: "Missing listing ID" }, { status: 400 });
+    }
+    
     await connectToDatabase();
 
     // Build update object from all provided fields
@@ -30,12 +34,13 @@ export async function PATCH(req: NextRequest) {
       "title", "description", "price", "condition", "make", "model",
       "year", "mileage", "fuelType", "transmission", "engineSize",
       "color", "location", "status", "featured", "images", "features",
+      "documents", "paperVerified", "paperVerifiedAt", "paperVerificationNote",
     ];
 
     const update: any = {};
     for (const field of allowedFields) {
-      if (fields[field] !== undefined) {
-        update[field] = fields[field];
+      if (body[field] !== undefined) {
+        update[field] = body[field];
       }
     }
 
@@ -50,9 +55,15 @@ export async function PATCH(req: NextRequest) {
         Date.now().toString(36);
     }
 
-    await Listing.findByIdAndUpdate(id, update);
-    return NextResponse.json({ success: true });
+    const updated = await Listing.findByIdAndUpdate(
+      id,
+      { $set: update },
+      { new: true, strict: false }
+    );
+
+    return NextResponse.json({ success: true, listing: JSON.parse(JSON.stringify(updated)) });
   } catch (error: any) {
+    console.error("Admin PATCH listing error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

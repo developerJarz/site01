@@ -191,12 +191,17 @@ export default async function CarDetailsPage(props: {
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent" />
 
               {/* Condition Badge */}
-              <div className="absolute top-4 left-4 flex gap-2">
+              <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                 <span
                   className={`${conditionBadgeClass} px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-sm`}
                 >
                   {car.condition}
                 </span>
+                {car.paperVerified && (
+                  <span className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 backdrop-blur-sm">
+                    <ShieldCheck size={14} /> Paper Verified
+                  </span>
+                )}
                 {car.featured && (
                   <span className="bg-primary text-white px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-primary/30">
                     Featured
@@ -355,6 +360,39 @@ export default async function CarDetailsPage(props: {
                 />
               </div>
             </div>
+
+            {/* Paper Verified Trust Banner (When Verified by Admin) */}
+            {car.paperVerified && (
+              <div className="bg-emerald-500/10 border-2 border-emerald-500/30 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-emerald-950 dark:text-emerald-200">
+                      Car Papers Verified
+                    </h3>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                      Authenticity Checked by CarHat.bd
+                    </p>
+                  </div>
+                </div>
+                <ul className="text-xs text-emerald-900/80 dark:text-emerald-200/80 space-y-1.5 pt-1 border-t border-emerald-500/20">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span>Registration Smart Card verified</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span>Fitness Certificate &amp; Tax Token authenticated</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span>Clean document history &amp; legitimate seller</span>
+                  </li>
+                </ul>
+              </div>
+            )}
 
             {/* Seller Info Card */}
             <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">

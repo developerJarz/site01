@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { Filter, MapPin, Search, Loader2 } from "lucide-react";
+import { Filter, MapPin, Search, Loader2, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import axios from "axios";
 
@@ -276,12 +276,19 @@ function CarsContent() {
                           backgroundImage: `url(${car.images?.[0] || "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600"})`,
                         }}
                       />
-                      {car.featured && (
-                        <div className="absolute top-2 left-2 bg-primary text-white text-xs font-bold px-2 py-1 rounded shadow-lg shadow-primary/30">
-                          FEATURED
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                        {car.featured && (
+                          <div className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg shadow-primary/30 uppercase tracking-wider">
+                            FEATURED
+                          </div>
+                        )}
+                        {car.paperVerified && (
+                          <div className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg shadow-emerald-600/30 flex items-center gap-1 backdrop-blur-sm uppercase tracking-wider">
+                            <ShieldCheck size={11} /> Paper Verified
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute top-2 right-2 z-10">
                         <span className={`${getConditionBadge(car.condition)} text-xs font-bold px-2.5 py-1 rounded-full capitalize backdrop-blur-sm`}>
                           {car.condition}
                         </span>

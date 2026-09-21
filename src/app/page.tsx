@@ -23,6 +23,7 @@ import {
   Users,
   Award,
   Car,
+  ShieldCheck,
 } from "lucide-react";
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
@@ -125,11 +126,13 @@ export default async function Home() {
   try {
     await connectToDatabase();
     trendingCars = await Listing.find({ status: "active" })
+      .select("-documents")
       .sort({ views: -1 })
       .limit(8)
       .lean() as any[];
 
     latestCars = await Listing.find({ status: "active" })
+      .select("-documents")
       .sort({ createdAt: -1 })
       .limit(4)
       .lean() as any[];
@@ -291,10 +294,17 @@ export default async function Home() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       
                       {/* Badges */}
-                      <div className="absolute top-3 left-3 z-20 flex gap-2">
-                        <span className="bg-gradient-to-r from-primary to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-primary/20 badge-shimmer">
-                          FEATURED
-                        </span>
+                      <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start">
+                        {car.featured && (
+                          <span className="bg-gradient-to-r from-primary to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-primary/20 badge-shimmer">
+                            FEATURED
+                          </span>
+                        )}
+                        {car.paperVerified && (
+                          <span className="bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-emerald-600/30 flex items-center gap-1 backdrop-blur-sm">
+                            <ShieldCheck size={12} /> Paper Verified
+                          </span>
+                        )}
                       </div>
                       <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg capitalize z-20 border border-white/10">
                         {car.condition}
@@ -470,10 +480,15 @@ export default async function Home() {
                           style={{ backgroundImage: `url(${car.images?.[0] || FALLBACK_CAR_IMAGE})` }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
-                        <div className="absolute top-3 left-3">
-                          <span className="bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-lg">
+                        <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
+                          <span className="bg-green-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-lg shadow-lg">
                             NEW
                           </span>
+                          {car.paperVerified && (
+                            <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg shadow-emerald-600/30 flex items-center gap-1 backdrop-blur-sm">
+                              <ShieldCheck size={11} /> Verified
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex-grow p-6 flex flex-col justify-between">

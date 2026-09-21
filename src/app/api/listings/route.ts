@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       slug,
       sellerId: (session.user as any).id,
       status: "active",
+      paperVerified: false,
       images:
         body.images && body.images.length > 0
           ? body.images
@@ -52,7 +53,10 @@ export async function GET(req: Request) {
     if (location) query.location = { $regex: location, $options: "i" };
 
     await connectToDatabase();
-    const listings = await Listing.find(query).sort({ createdAt: -1 }).limit(50);
+    const listings = await Listing.find(query)
+      .select("-documents")
+      .sort({ createdAt: -1 })
+      .limit(50);
     return NextResponse.json({ listings }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

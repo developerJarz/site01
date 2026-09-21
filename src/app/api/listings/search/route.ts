@@ -57,6 +57,7 @@ export async function GET(req: Request) {
       location: car.location,
       images: car.images,
       featured: car.featured,
+      paperVerified: !!car.paperVerified,
     }));
 
     return NextResponse.json({ listings: formatted });

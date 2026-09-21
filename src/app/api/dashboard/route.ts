@@ -65,6 +65,8 @@ export async function GET() {
       views: l.views,
       images: l.images,
       condition: l.condition,
+      paperVerified: !!(l as any).paperVerified,
+      hasDocuments: !!(l.documents && l.documents.length > 0),
       createdAt: (l as any).createdAt,
     }));
 

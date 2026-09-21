@@ -11,8 +11,64 @@ import {
   FileText,
   Loader2,
   ImageIcon,
+  ShieldCheck,
+  Lock,
+  BadgeCheck,
+  FileCheck2,
 } from "lucide-react";
 import axios from "axios";
+
+// Client-side image compression to ensure fast, reliable uploads on live sites
+async function compressImageFile(file: File, maxDim = 1600, quality = 0.82): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type.includes("svg")) {
+    return file;
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+            const newFile = new File([blob], cleanName, { type: "image/webp" });
+            resolve(newFile);
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function SellCarPage() {
   const { data: session, status } = useSession();
@@ -20,6 +76,7 @@ export default function SellCarPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadStatusText, setUploadStatusText] = useState("");
 
   // Image uploads
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -118,29 +175,51 @@ export default function SellCarPage() {
     setError("");
 
     try {
-      // 1. Upload images via the upload API
+      // 1. Compress and Upload images via the upload API
       let imageUrls: string[] = [];
       if (imageFiles.length > 0) {
         setUploadingImages(true);
+        setUploadStatusText("Optimizing car photos...");
+        
+        const compressedFiles: File[] = [];
+        for (const file of imageFiles) {
+          const compressed = await compressImageFile(file, 1600, 0.82);
+          compressedFiles.push(compressed);
+        }
+
+        setUploadStatusText("Uploading photos...");
         const fd = new FormData();
-        imageFiles.forEach((f) => fd.append("files", f));
+        compressedFiles.forEach((f) => fd.append("files", f));
         const uploadRes = await axios.post("/api/upload", fd);
-        imageUrls = uploadRes.data.urls;
+        imageUrls = uploadRes.data.urls || [];
         setUploadingImages(false);
       }
 
-      // 2. Upload documents
+      // 2. Upload documents (Registration / Tax / Fitness)
       let docUrls: string[] = [];
       if (docFiles.length > 0) {
         setUploadingDocs(true);
+        setUploadStatusText("Uploading private car papers...");
+        
+        const compressedDocFiles: File[] = [];
+        for (const file of docFiles) {
+          if (file.type.startsWith("image/")) {
+            const compressed = await compressImageFile(file, 1600, 0.85);
+            compressedDocFiles.push(compressed);
+          } else {
+            compressedDocFiles.push(file);
+          }
+        }
+
         const fd = new FormData();
-        docFiles.forEach((f) => fd.append("files", f));
+        compressedDocFiles.forEach((f) => fd.append("files", f));
         const uploadRes = await axios.post("/api/upload", fd);
-        docUrls = uploadRes.data.urls;
+        docUrls = uploadRes.data.urls || [];
         setUploadingDocs(false);
       }
 
       // 3. Create listing
+      setUploadStatusText("Publishing listing...");
       const response = await axios.post("/api/listings", {
         ...formData,
         price: Number(formData.price),
@@ -155,11 +234,17 @@ export default function SellCarPage() {
         setStep(4); // success step
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to post ad");
+      console.error("Sell submission error:", err);
+      setError(
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to post ad. Please verify your connection and try again."
+      );
     } finally {
       setLoading(false);
       setUploadingImages(false);
       setUploadingDocs(false);
+      setUploadStatusText("");
     }
   };
 
@@ -492,13 +577,36 @@ export default function SellCarPage() {
             </div>
 
             {/* Car Documents */}
-            <div>
-              <h2 className="text-xl font-semibold mb-1">
-                Upload Car Documents <span className="text-destructive">*</span>
-              </h2>
+            <div className="bg-muted/10 border border-border rounded-2xl p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <FileCheck2 className="text-primary" size={22} />
+                  Upload Car Papers &amp; Documents
+                  <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    Optional but Highly Recommended
+                  </span>
+                </h2>
+              </div>
+              
               <p className="text-sm text-muted-foreground mb-4">
-                Upload registration papers, fitness certificate, tax token, etc. This is required.
+                Upload your car&apos;s registration certificate, fitness paper, tax token, or ownership slip.
               </p>
+
+              {/* Privacy & Trust Banner */}
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-5 flex items-start gap-3">
+                <ShieldCheck className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                <div className="text-xs text-emerald-950 dark:text-emerald-200 space-y-1">
+                  <p className="font-semibold flex items-center gap-1">
+                    <Lock size={12} /> 100% Confidential &amp; Admin-Only View
+                  </p>
+                  <p className="opacity-90">
+                    Your car papers are never shown to the public. Only CarHat authorized admins can view these documents to authenticate the car.
+                  </p>
+                  <p className="font-medium text-emerald-600 dark:text-emerald-400 pt-0.5">
+                    ✨ Once verified by admin, your listing gets an exclusive <strong>&quot;Paper Verified&quot;</strong> badge to win buyer trust and sell 3x faster!
+                  </p>
+                </div>
+              </div>
 
               <input
                 ref={docInputRef}
@@ -514,15 +622,20 @@ export default function SellCarPage() {
                   {docNames.map((name, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between bg-muted/50 border border-border rounded-lg px-4 py-3"
+                      className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 shadow-sm"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText size={18} className="text-primary flex-shrink-0" />
-                        <span className="text-sm truncate">{name}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText size={20} className="text-primary flex-shrink-0" />
+                        <div>
+                          <span className="text-sm font-medium truncate block">{name}</span>
+                          <span className="text-[11px] text-muted-foreground">Private Document #{i + 1}</span>
+                        </div>
                       </div>
                       <button
+                        type="button"
                         onClick={() => removeDoc(i)}
-                        className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                        className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-colors"
+                        title="Remove document"
                       >
                         <X size={16} />
                       </button>
@@ -532,39 +645,47 @@ export default function SellCarPage() {
               )}
 
               <button
+                type="button"
                 onClick={() => docInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-muted-foreground hover:border-primary/40 hover:bg-muted/30 transition-all cursor-pointer"
+                className="w-full border-2 border-dashed border-border hover:border-primary/50 bg-background/50 hover:bg-muted/30 rounded-xl p-6 flex flex-col items-center justify-center text-muted-foreground transition-all cursor-pointer"
               >
-                <Upload size={32} className="mb-2 text-primary/50" />
-                <p className="font-medium">Click to upload documents</p>
-                <p className="text-xs mt-1">
-                  Images or PDF — registration, fitness, tax token
+                <Upload size={32} className="mb-2 text-primary/60" />
+                <p className="font-medium text-foreground text-sm">Click to select car papers (PDF or Image)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Registration Smart Card, Tax Token, Fitness Certificate, Route Permit
                 </p>
+                {docFiles.length > 0 && (
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
+                    ✓ {docFiles.length} document(s) attached for verification
+                  </p>
+                )}
               </button>
             </div>
 
             <div className="flex justify-between mt-8">
               <button
+                type="button"
                 onClick={handleBack}
-                className="bg-muted text-muted-foreground px-8 py-2.5 rounded-lg font-medium hover:bg-muted/80 transition-colors"
+                disabled={loading}
+                className="bg-muted text-muted-foreground px-8 py-2.5 rounded-lg font-medium hover:bg-muted/80 transition-colors disabled:opacity-50"
               >
                 ← Back
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
-                disabled={
-                  imageFiles.length === 0 || docFiles.length === 0 || loading
-                }
+                disabled={imageFiles.length === 0 || loading}
                 className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20 flex items-center gap-2"
               >
                 {loading ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    {uploadingImages
-                      ? "Uploading photos..."
-                      : uploadingDocs
-                      ? "Uploading docs..."
-                      : "Publishing..."}
+                    {uploadStatusText ||
+                      (uploadingImages
+                        ? "Uploading photos..."
+                        : uploadingDocs
+                        ? "Uploading docs..."
+                        : "Publishing...")}
                   </>
                 ) : (
                   "Post Ad Now 🚀"
@@ -579,10 +700,15 @@ export default function SellCarPage() {
           <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in-95">
             <CheckCircle size={80} className="text-green-500 mb-6" />
             <h2 className="text-3xl font-bold mb-2">Ad Posted Successfully!</h2>
-            <p className="text-muted-foreground mb-8 text-center max-w-md">
-              Your car listing for {formData.year} {formData.make}{" "}
-              {formData.model} is now live and visible to buyers!
+            <p className="text-muted-foreground mb-4 text-center max-w-md">
+              Your car listing for <span className="font-semibold text-foreground">{formData.year} {formData.make} {formData.model}</span> is now published!
             </p>
+            {docFiles.length > 0 && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs px-4 py-3 rounded-xl max-w-md text-center mb-8 flex items-center gap-2">
+                <BadgeCheck className="text-emerald-500 flex-shrink-0" size={20} />
+                <span>Our team is reviewing your uploaded papers. Once verified, the &quot;Paper Verified&quot; badge will be applied automatically!</span>
+              </div>
+            )}
             <div className="flex gap-4">
               <button
                 onClick={() => router.push("/dashboard")}

@@ -19,6 +19,9 @@ export interface IListing {
   sellerId: mongoose.Types.ObjectId;
   images: string[];
   documents: string[];
+  paperVerified?: boolean;
+  paperVerifiedAt?: Date;
+  paperVerificationNote?: string;
   videos?: string[];
   features: string[];
   views: number;
@@ -55,6 +58,9 @@ const ListingSchema: Schema<IListing> = new Schema(
     sellerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     images: [{ type: String }],
     documents: [{ type: String }],
+    paperVerified: { type: Boolean, default: false },
+    paperVerifiedAt: { type: Date },
+    paperVerificationNote: { type: String },
     videos: [{ type: String }],
     features: [{ type: String }],
     views: { type: Number, default: 0 },
@@ -65,8 +71,14 @@ const ListingSchema: Schema<IListing> = new Schema(
     },
     featured: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
+
+if (mongoose.models.Listing) {
+  delete (mongoose.models as any).Listing;
+}
 
 export const Listing: Model<IListing> =
   mongoose.models.Listing || mongoose.model<IListing>("Listing", ListingSchema);
+
+
