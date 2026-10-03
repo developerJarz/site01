@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
 import { User } from "@/lib/models/User";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     await connectToDatabase();
 

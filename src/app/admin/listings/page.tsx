@@ -1,25 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  Loader2,
-  Trash2,
+  Download,
   ExternalLink,
-  Star,
   Eye,
-  Pencil,
-  X,
-  Save,
-  Car,
-  ShieldCheck,
-  FileCheck2,
-  FileText,
-  CheckCircle2,
-  XCircle,
   FileSearch,
-  Lock,
+  FileText,
+  Loader2,
+  Pencil,
+  Search,
+  ShieldCheck,
+  Star,
+  Trash2,
+  X,
 } from "lucide-react";
+import { CarImage } from "@/components/CarImage";
+import {
+  Button,
+  Checkbox,
+  CountTabs,
+  Field,
+  Modal,
+  PageHeader,
+  Pagination,
+  STATUS_LABEL,
+  StatusBadge,
+  api,
+  inputClass,
+  useConfirm,
+} from "@/components/admin/ui";
+import { useToast } from "@/components/admin/Toast";
+import { cn, formatLakh, formatTaka, timeAgo } from "@/lib/utils";
 
 interface Listing {
   _id: string;
@@ -43,906 +57,854 @@ interface Listing {
   paperVerified?: boolean;
   paperVerifiedAt?: string;
   paperVerificationNote?: string;
-  documents?: string[];
-  images: string[];
-  features: string[];
+  thumb?: string;
+  imageCount: number;
+  docCount: number;
   createdAt: string;
-  sellerId: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-    phone?: string;
-  };
+  sellerId?: { _id?: string; name?: string; email?: string; role?: string; phone?: string };
 }
 
-interface EditFormData {
-  title: string;
-  description: string;
-  price: number;
-  condition: string;
-  make: string;
-  model: string;
-  year: number;
-  mileage: number;
-  fuelType: string;
-  transmission: string;
-  engineSize: number;
-  color: string;
-  location: string;
-  status: string;
-  featured: boolean;
-  paperVerified: boolean;
+interface ListResponse {
+  listings: Listing[];
+  total: number;
+  page: number;
+  pages: number;
+  counts: Record<string, number>;
 }
+
+type StatusTab = "all" | "active" | "pending" | "sold" | "removed";
+
+const PAPER_FILTERS = [
+  { value: "", label: "Any papers" },
+  { value: "awaiting", label: "Waiting for check" },
+  { value: "verified", label: "Paper Verified" },
+  { value: "none", label: "No papers uploaded" },
+];
+
+const SORTS = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "price-high", label: "Price, high to low" },
+  { value: "price-low", label: "Price, low to high" },
+  { value: "views", label: "Most viewed" },
+];
 
 export default function AdminListingsPage() {
-  const [listings, setListings] = useState<Listing[]>([]);
+  return (
+    <Suspense fallback={<div className="skeleton h-96 rounded-xl" />}>
+      <ListingsManager />
+    </Suspense>
+  );
+}
+
+function ListingsManager() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+
+  const status = (params.get("status") || "all") as StatusTab;
+  const q = params.get("q") || "";
+  const papers = params.get("papers") || "";
+  const featured = params.get("featured") === "1";
+  const sort = params.get("sort") || "newest";
+  const page = Number(params.get("page")) || 1;
+
+  const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [editingListing, setEditingListing] = useState<Listing | null>(null);
-  const [editForm, setEditForm] = useState<EditFormData | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Listing | null>(null);
+  const [inspecting, setInspecting] = useState<Listing | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [search, setSearch] = useState(q);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  // Paper Inspection Modal State
-  const [inspectingListing, setInspectingListing] = useState<Listing | null>(null);
-  const [activeDocIndex, setActiveDocIndex] = useState(0);
+  const setParams = useCallback(
+    (updates: Record<string, string | undefined>, resetPage = true) => {
+      const next = new URLSearchParams(params.toString());
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      if (resetPage && !("page" in updates)) next.delete("page");
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    },
+    [params, pathname, router]
+  );
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((current) => (current === msg ? null : current));
-    }, 4000);
-  };
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (status !== "all") p.set("status", status);
+    if (q) p.set("q", q);
+    if (papers) p.set("papers", papers);
+    if (featured) p.set("featured", "1");
+    if (sort !== "newest") p.set("sort", sort);
+    p.set("page", String(page));
+    p.set("limit", "20");
+    return p.toString();
+  }, [status, q, papers, featured, sort, page]);
 
-  const fetchListings = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/admin/listings?t=" + Date.now(), {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      const data = await res.json();
-      setListings(data.listings || []);
-    } catch (error) {
-      console.error("fetchListings error:", error);
+      setData(await api<ListResponse>(`/api/admin/listings?${queryString}`));
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [queryString]);
 
   useEffect(() => {
-    fetchListings();
+    load();
+  }, [load]);
+
+  // Selection belongs to one result set; clear it when the filters change.
+  useEffect(() => setSelected(new Set()), [queryString]);
+
+  useEffect(() => setSearch(q), [q]);
+  useEffect(() => {
+    if (search === q) return;
+    const t = setTimeout(() => setParams({ q: search.trim() || undefined }), 350);
+    return () => clearTimeout(t);
+  }, [search, q, setParams]);
+
+  // "/" jumps to search, like most admin tools.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(tag)) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const openEditForm = (listing: Listing) => {
-    setEditingListing(listing);
-    setEditForm({
-      title: listing.title,
-      description: listing.description || "",
-      price: listing.price,
-      condition: listing.condition,
-      make: listing.make || "",
-      model: listing.model || "",
-      year: listing.year || new Date().getFullYear(),
-      mileage: listing.mileage || 0,
-      fuelType: listing.fuelType || "petrol",
-      transmission: listing.transmission || "manual",
-      engineSize: listing.engineSize || 0,
-      color: listing.color || "",
-      location: listing.location || "",
-      status: listing.status,
-      featured: listing.featured,
-      paperVerified: !!listing.paperVerified,
+  const refreshAll = async () => {
+    window.dispatchEvent(new Event("admin:counts-changed"));
+    await load();
+  };
+
+  const patchOne = async (l: Listing, update: Partial<Listing>, message: string) => {
+    setBusy(l._id);
+    // Optimistic: reflect the change immediately, then confirm with the server.
+    setData((d) => d && { ...d, listings: d.listings.map((x) => (x._id === l._id ? { ...x, ...update } : x)) });
+    try {
+      await api("/api/admin/listings", { method: "PATCH", body: JSON.stringify({ id: l._id, ...update }) });
+      toast.success(message);
+      await refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const bulk = async (update: Record<string, unknown>, message: string) => {
+    const ids = Array.from(selected);
+    setBusy("bulk");
+    try {
+      const res = await api<{ modified: number }>("/api/admin/listings", { method: "PATCH", body: JSON.stringify({ ids, ...update }) });
+      toast.success(message.replace("{n}", String(res.modified)));
+      setSelected(new Set());
+      await refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (ids: string[], label: string) => {
+    const ok = await confirm({
+      title: ids.length === 1 ? "Delete this listing?" : `Delete ${ids.length} listings?`,
+      body: (
+        <>
+          <strong className="text-foreground">{label}</strong> will be removed permanently, including photos and papers. To hide a
+          listing but keep it, set its status to Removed instead.
+        </>
+      ),
+      confirmLabel: ids.length === 1 ? "Delete listing" : `Delete ${ids.length} listings`,
+      tone: "danger",
     });
-  };
-
-  const closeEditForm = () => {
-    setEditingListing(null);
-    setEditForm(null);
-  };
-
-  const openInspectPapers = (listing: Listing) => {
-    setInspectingListing(listing);
-    setActiveDocIndex(0);
-  };
-
-  const closeInspectPapers = () => {
-    setInspectingListing(null);
-    setActiveDocIndex(0);
-  };
-
-  const togglePaperVerification = async (listing: Listing, verified: boolean) => {
-    setActionLoading(listing._id);
-    const nowStr = new Date().toISOString();
-
-    // Optimistically update React state immediately
-    setListings((prev) =>
-      prev.map((l) =>
-        l._id === listing._id
-          ? {
-              ...l,
-              paperVerified: verified,
-              paperVerifiedAt: verified ? nowStr : undefined,
-            }
-          : l
-      )
-    );
-
-    if (inspectingListing && inspectingListing._id === listing._id) {
-      setInspectingListing({
-        ...inspectingListing,
-        paperVerified: verified,
-        paperVerifiedAt: verified ? nowStr : undefined,
-      });
-    }
-
+    if (!ok) return;
+    setBusy(ids.length === 1 ? ids[0] : "bulk");
     try {
-      const res = await fetch("/api/admin/listings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: listing._id,
-          paperVerified: verified,
-          paperVerifiedAt: verified ? nowStr : null,
-        }),
-      });
+      const res = await api<{ deleted: number }>("/api/admin/listings", { method: "DELETE", body: JSON.stringify({ ids }) });
+      toast.success(`Deleted ${res.deleted} ${res.deleted === 1 ? "listing" : "listings"}.`);
+      setSelected(new Set());
+      await refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to update verification status");
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const base = new URLSearchParams(queryString);
+      base.set("limit", "100");
+      const rows: Listing[] = [];
+      for (let p = 1; p <= 50; p++) {
+        base.set("page", String(p));
+        const res = await api<ListResponse>(`/api/admin/listings?${base.toString()}`);
+        rows.push(...res.listings);
+        if (p >= res.pages) break;
       }
-
-      showToast(
-        verified
-          ? `✓ "${listing.title}" successfully approved and marked as Paper Verified!`
-          : `Paper verification revoked for "${listing.title}".`
+      const header = ["Title", "Make", "Model", "Year", "Price (BDT)", "Status", "Condition", "Location", "Views", "Featured", "Paper Verified", "Papers", "Seller", "Seller email", "Listed", "URL"];
+      const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const lines = rows.map((l) =>
+        [l.title, l.make, l.model, l.year, l.price, STATUS_LABEL[l.status] || l.status, l.condition, l.location, l.views, l.featured ? "Yes" : "No", l.paperVerified ? "Yes" : "No", l.docCount, l.sellerId?.name, l.sellerId?.email, new Date(l.createdAt).toISOString().slice(0, 10), `${window.location.origin}/cars/${l.slug}`]
+          .map(esc)
+          .join(",")
       );
-
-      // Refresh in background to sync
-      fetchListings();
-    } catch (error: any) {
-      console.error("togglePaperVerification error:", error);
-      showToast("❌ Error: " + (error.message || "Failed to update"));
-      // Revert on error
-      fetchListings();
+      const blob = new Blob(["﻿" + [header.map(esc).join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `carhat-listings-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast.success(`Exported ${rows.length} listings.`);
+    } catch (e) {
+      toast.error((e as Error).message);
     } finally {
-      setActionLoading(null);
+      setExporting(false);
     }
   };
 
-  const saveEdit = async () => {
-    if (!editingListing || !editForm) return;
-    setActionLoading(editingListing._id);
-    try {
-      await fetch("/api/admin/listings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingListing._id, ...editForm }),
-      });
-      closeEditForm();
-      fetchListings();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const listings = data?.listings || [];
+  const allSelected = listings.length > 0 && listings.every((l) => selected.has(l._id));
+  const toggleAll = (on: boolean) => setSelected(on ? new Set(listings.map((l) => l._id)) : new Set());
+  const toggleOne = (id: string, on: boolean) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
 
-  const updateListing = async (id: string, update: Partial<Listing>) => {
-    setActionLoading(id);
-    try {
-      await fetch("/api/admin/listings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...update }),
-      });
-      fetchListings();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const deleteListing = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this listing permanently?")) return;
-    setActionLoading(id);
-    try {
-      await fetch("/api/admin/listings", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      fetchListings();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={32} className="animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const statusColor: Record<string, string> = {
-    active: "bg-green-500/10 text-green-600",
-    pending: "bg-amber-500/10 text-amber-600",
-    sold: "bg-blue-500/10 text-blue-600",
-    removed: "bg-red-500/10 text-red-600",
-  };
+  const counts = data?.counts;
+  const tabs: { value: StatusTab; label: string; count?: number }[] = [
+    { value: "all", label: "All", count: counts?.all },
+    { value: "pending", label: "Pending review", count: counts?.pending },
+    { value: "active", label: "Live", count: counts?.active },
+    { value: "sold", label: "Sold", count: counts?.sold },
+    { value: "removed", label: "Removed", count: counts?.removed },
+  ];
+  const filtered = !!(q || papers || featured);
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Listings Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage all {listings.length} vehicle listings on the platform
-          </p>
+    <div className="space-y-5 pb-24">
+      <PageHeader
+        title="Listings"
+        description="Approve new cars, check papers and keep the marketplace tidy."
+        actions={
+          <Button onClick={exportCsv} loading={exporting} disabled={!data || data.total === 0}>
+            {!exporting && <Download size={16} />} Export CSV
+          </Button>
+        }
+      />
+
+      <CountTabs label="Filter by status" tabs={tabs} value={status} onChange={(v) => setParams({ status: v === "all" ? undefined : v })} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[14rem] grow sm:max-w-sm">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            ref={searchRef}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search title, make, model or city"
+            aria-label="Search listings"
+            className={cn(inputClass, "pl-9 pr-10")}
+          />
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 text-xs text-muted-foreground sm:block">/</kbd>
         </div>
+        <select value={papers} onChange={(e) => setParams({ papers: e.target.value || undefined })} aria-label="Filter by papers" className={cn(inputClass, "w-auto")}>
+          {PAPER_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+        <button
+          type="button"
+          aria-pressed={featured}
+          onClick={() => setParams({ featured: featured ? undefined : "1" })}
+          className={cn(
+            "inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold",
+            featured ? "border-marigold bg-[#fdf3dc] text-[#7a5200]" : "border-input bg-card hover:bg-muted"
+          )}
+        >
+          <Star size={15} className={featured ? "fill-marigold text-[#b27c00]" : ""} aria-hidden /> Featured
+        </button>
+        <select value={sort} onChange={(e) => setParams({ sort: e.target.value === "newest" ? undefined : e.target.value })} aria-label="Sort" className={cn(inputClass, "w-auto")}>
+          {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        {filtered && (
+          <Button variant="ghost" onClick={() => setParams({ q: undefined, papers: undefined, featured: undefined })}>
+            Clear filters
+          </Button>
+        )}
       </div>
 
-      {/* Edit Modal */}
-      {editingListing && editForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEditForm(); }}>
-          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between rounded-t-2xl z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <Pencil size={20} className="text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Edit Listing</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {editingListing.title.substring(0, 50)}{editingListing.title.length > 50 ? "..." : ""}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={closeEditForm}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Title</label>
-                <input
-                  type="text"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea
-                  rows={4}
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none"
-                />
-              </div>
-
-              {/* Price, Condition, Status row */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Price (৳)</label>
-                  <input
-                    type="number"
-                    value={editForm.price}
-                    onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Condition</label>
-                  <select
-                    value={editForm.condition}
-                    onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    <option value="new">New</option>
-                    <option value="used">Used</option>
-                    <option value="reconditioned">Reconditioned</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    <option value="active">Active</option>
-                    <option value="pending">Pending</option>
-                    <option value="sold">Sold</option>
-                    <option value="removed">Removed</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Make, Model, Year */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Make</label>
-                  <input
-                    type="text"
-                    value={editForm.make}
-                    onChange={(e) => setEditForm({ ...editForm, make: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="e.g. Toyota"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Model</label>
-                  <input
-                    type="text"
-                    value={editForm.model}
-                    onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="e.g. Corolla"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Year</label>
-                  <input
-                    type="number"
-                    value={editForm.year}
-                    onChange={(e) => setEditForm({ ...editForm, year: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Mileage, Fuel Type, Transmission */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Mileage (km)</label>
-                  <input
-                    type="number"
-                    value={editForm.mileage}
-                    onChange={(e) => setEditForm({ ...editForm, mileage: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Fuel Type</label>
-                  <select
-                    value={editForm.fuelType}
-                    onChange={(e) => setEditForm({ ...editForm, fuelType: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    <option value="petrol">Petrol</option>
-                    <option value="diesel">Diesel</option>
-                    <option value="cng">CNG</option>
-                    <option value="hybrid">Hybrid</option>
-                    <option value="electric">Electric</option>
-                    <option value="octane">Octane</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Transmission</label>
-                  <select
-                    value={editForm.transmission}
-                    onChange={(e) => setEditForm({ ...editForm, transmission: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    <option value="manual">Manual</option>
-                    <option value="automatic">Automatic</option>
-                    <option value="semi-automatic">Semi-Automatic</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Engine Size, Color, Location */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Engine Size (cc)</label>
-                  <input
-                    type="number"
-                    value={editForm.engineSize}
-                    onChange={(e) => setEditForm({ ...editForm, engineSize: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Color</label>
-                  <input
-                    type="text"
-                    value={editForm.color}
-                    onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="e.g. White"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={editForm.location}
-                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="e.g. Dhaka"
-                  />
-                </div>
-              </div>
-
-              {/* Featured & Paper Verified Toggles */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-xl border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setEditForm({ ...editForm, featured: !editForm.featured })}
-                    className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                      editForm.featured ? "bg-primary" : "bg-border"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                        editForm.featured ? "translate-x-6" : ""
-                      }`}
-                    />
-                  </button>
-                  <div>
-                    <p className="text-sm font-medium">Featured Listing</p>
-                    <p className="text-xs text-muted-foreground">
-                      Appears at top of search results
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
-                  <button
-                    type="button"
-                    onClick={() => setEditForm({ ...editForm, paperVerified: !editForm.paperVerified })}
-                    className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                      editForm.paperVerified ? "bg-emerald-500" : "bg-border"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                        editForm.paperVerified ? "translate-x-6" : ""
-                      }`}
-                    />
-                  </button>
-                  <div>
-                    <p className="text-sm font-medium flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                      <ShieldCheck size={16} /> Paper Verified Badge
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Shows verified trust badge to public buyers
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-card border-t border-border p-6 flex justify-end gap-3 rounded-b-2xl">
-              <button
-                onClick={closeEditForm}
-                className="px-5 py-2.5 rounded-lg font-medium text-muted-foreground hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={actionLoading === editingListing._id}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
-              >
-                {actionLoading === editingListing._id ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
-                Save Changes
-              </button>
-            </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {error ? (
+          <div className="p-10 text-center">
+            <p className="font-semibold">Listings couldn&apos;t load.</p>
+            <p className="mt-1 text-muted-foreground">{error}</p>
+            <Button className="mt-4" variant="primary" onClick={load}>Try again</Button>
           </div>
-        </div>
-      )}
-
-      {/* Inspect Car Papers Modal */}
-      {inspectingListing && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) closeInspectPapers(); }}
-        >
-          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-            {/* Header */}
-            <div className="bg-card border-b border-border p-5 flex items-center justify-between z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
-                  <FileSearch size={22} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    Inspect Car Papers
-                    {inspectingListing.paperVerified ? (
-                      <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Paper Verified
-                      </span>
-                    ) : (
-                      <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                        Verification Pending
-                      </span>
-                    )}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {inspectingListing.title} • Seller: {inspectingListing.sellerId?.name || "Unknown"} ({inspectingListing.sellerId?.email})
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={closeInspectPapers}
-                className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-              >
-                <X size={20} />
-              </button>
+        ) : !data ? (
+          <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-lg" />)}</div>
+        ) : listings.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-lg font-semibold">{status === "pending" && !filtered ? "No listings waiting for review" : "No listings match"}</p>
+            <p className="mt-1 text-muted-foreground">
+              {filtered ? "Try a different search or clear the filters." : "Listings will appear here as sellers post them."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className={cn("relative hidden overflow-x-auto md:block", loading && "opacity-60")}>
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/60 text-left text-[13px] text-muted-foreground">
+                  <tr>
+                    <th className="w-10 py-3 pl-4">
+                      <Checkbox label="Select all on this page" checked={allSelected} indeterminate={selected.size > 0} onChange={toggleAll} />
+                    </th>
+                    <th className="px-3 py-3 font-semibold">Car</th>
+                    <th className="px-3 py-3 font-semibold">Seller</th>
+                    <th className="px-3 py-3 font-semibold">Status</th>
+                    <th className="px-3 py-3 font-semibold">Papers</th>
+                    <th className="px-3 py-3 text-right font-semibold">Views</th>
+                    <th className="px-3 py-3 font-semibold">Listed</th>
+                    <th className="py-3 pl-3 pr-4 text-right font-semibold"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {listings.map((l) => (
+                    <tr key={l._id} className={cn("align-middle", selected.has(l._id) ? "bg-accent/60" : "hover:bg-muted/40")}>
+                      <td className="py-3 pl-4">
+                        <Checkbox label={`Select ${l.title}`} checked={selected.has(l._id)} onChange={(on) => toggleOne(l._id, on)} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
+                            <CarImage src={l.thumb} alt="" sizes="64px" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5">
+                              <span className="max-w-[16rem] truncate font-semibold" title={l.title}>{l.title}</span>
+                              {l.featured && <Star size={14} className="shrink-0 fill-marigold text-[#b27c00]" aria-label="Featured" />}
+                            </p>
+                            <p className="text-muted-foreground">
+                              <span className="font-semibold text-foreground tabular">{formatLakh(l.price)}</span>, {l.year} {l.make}, {l.location}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="max-w-[10rem] truncate font-medium">{l.sellerId?.name || "Unknown"}</p>
+                        <p className="capitalize text-muted-foreground">{l.sellerId?.role || "—"}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        <StatusSelect listing={l} disabled={busy === l._id} onChange={(s) => patchOne(l, { status: s }, `Status set to ${STATUS_LABEL[s]}.`)} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <PapersCell listing={l} onInspect={() => setInspecting(l)} />
+                      </td>
+                      <td className="px-3 py-3 text-right tabular">{l.views.toLocaleString("en-IN")}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">{timeAgo(l.createdAt)}</td>
+                      <td className="py-3 pl-3 pr-4">
+                        <RowActions
+                          listing={l}
+                          busy={busy === l._id}
+                          onFeature={() => patchOne(l, { featured: !l.featured }, l.featured ? "Removed from featured." : "Marked as featured.")}
+                          onEdit={() => setEditing(l)}
+                          onDelete={() => remove([l._id], l.title)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              {/* Privacy Notice Banner */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 flex items-center gap-3 text-xs text-blue-900 dark:text-blue-200">
-                <Lock size={16} className="text-blue-500 flex-shrink-0" />
-                <span>
-                  <strong>Admin Confidential:</strong> These papers are private. Regular visitors and buyers on CarHat.bd cannot see these files.
-                </span>
-              </div>
-
-              {/* Status Banner inside Modal */}
-              {inspectingListing.paperVerified && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between gap-3 text-emerald-900 dark:text-emerald-200">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 size={20} className="text-emerald-500 flex-shrink-0" />
-                    <div>
-                      <p className="font-bold text-sm">Paper Verified Badge is Live!</p>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                        This vehicle displays the official verified shield badge across CarHat.bd search, homepage, and details page.
+            {/* Phone cards */}
+            <ul className={cn("divide-y divide-border md:hidden", loading && "opacity-60")}>
+              <li className="flex items-center gap-3 bg-muted/60 px-4 py-2.5 text-sm">
+                <Checkbox label="Select all on this page" checked={allSelected} indeterminate={selected.size > 0} onChange={toggleAll} />
+                <span className="text-muted-foreground">Select all</span>
+              </li>
+              {listings.map((l) => (
+                <li key={l._id} className={cn("px-4 py-3.5", selected.has(l._id) && "bg-accent/60")}>
+                  <div className="flex gap-3">
+                    <div className="pt-1">
+                      <Checkbox label={`Select ${l.title}`} checked={selected.has(l._id)} onChange={(on) => toggleOne(l._id, on)} />
+                    </div>
+                    <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
+                      <CarImage src={l.thumb} alt="" sizes="80px" />
+                    </div>
+                    <div className="min-w-0 grow">
+                      <p className="truncate font-semibold">{l.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground tabular">{formatLakh(l.price)}</span>, {l.sellerId?.name || "Unknown"}
                       </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge status={l.status} />
+                        <PapersCell listing={l} onInspect={() => setInspecting(l)} compact />
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={actionLoading === inspectingListing._id}
-                    onClick={() => togglePaperVerification(inspectingListing, false)}
-                    className="text-xs text-red-500 hover:underline font-semibold flex-shrink-0"
-                  >
-                    Revoke
-                  </button>
-                </div>
-              )}
-
-              {/* Documents List / Viewer */}
-              {!inspectingListing.documents || inspectingListing.documents.length === 0 ? (
-                <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center text-muted-foreground">
-                  <FileText size={40} className="mx-auto mb-3 text-muted-foreground/50" />
-                  <h3 className="font-semibold text-foreground">No Papers Uploaded</h3>
-                  <p className="text-sm mt-1">The seller did not attach car documents for this listing.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Doc selection tabs */}
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {inspectingListing.documents.map((docUrl, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setActiveDocIndex(idx)}
-                        className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer ${
-                          activeDocIndex === idx
-                            ? "bg-primary text-white shadow-md shadow-primary/20"
-                            : "bg-muted/50 hover:bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <FileText size={14} />
-                        <span>Document #{idx + 1}</span>
-                      </button>
-                    ))}
+                  <div className="mt-3 flex items-center justify-between pl-8">
+                    <StatusSelect listing={l} disabled={busy === l._id} onChange={(s) => patchOne(l, { status: s }, `Status set to ${STATUS_LABEL[s]}.`)} />
+                    <RowActions
+                      listing={l}
+                      busy={busy === l._id}
+                      onFeature={() => patchOne(l, { featured: !l.featured }, l.featured ? "Removed from featured." : "Marked as featured.")}
+                      onEdit={() => setEditing(l)}
+                      onDelete={() => remove([l._id], l.title)}
+                    />
                   </div>
+                </li>
+              ))}
+            </ul>
 
-                  {/* Document preview container */}
-                  {inspectingListing.documents[activeDocIndex] && (
-                    <div className="border border-border rounded-2xl bg-muted/20 overflow-hidden flex flex-col items-center justify-center p-4 min-h-[350px]">
-                      {inspectingListing.documents[activeDocIndex].includes("data:application/pdf") ||
-                      inspectingListing.documents[activeDocIndex].toLowerCase().endsWith(".pdf") ? (
-                        <div className="text-center p-8 space-y-4">
-                          <FileText size={56} className="text-primary mx-auto" />
-                          <div>
-                            <p className="font-semibold text-base">PDF Document #{activeDocIndex + 1}</p>
-                            <p className="text-xs text-muted-foreground">Click below to open/download PDF in a new tab</p>
-                          </div>
-                          <a
-                            href={inspectingListing.documents[activeDocIndex]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-                          >
-                            <ExternalLink size={16} /> Open PDF Paper
-                          </a>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 w-full flex flex-col items-center">
-                          <div className="max-h-[480px] overflow-auto rounded-xl border border-border bg-black/50 p-2 w-full flex items-center justify-center">
-                            <img
-                              src={inspectingListing.documents[activeDocIndex]}
-                              alt={`Car Document ${activeDocIndex + 1}`}
-                              className="max-h-[450px] max-w-full object-contain rounded-lg"
-                            />
-                          </div>
-                          <a
-                            href={inspectingListing.documents[activeDocIndex]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
-                          >
-                            <ExternalLink size={12} /> View Full Resolution Image in New Tab
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <Pagination page={data.page} pages={data.pages} total={data.total} noun={data.total === 1 ? "listing" : "listings"} onPage={(p) => setParams({ page: String(p) }, false)} />
+          </>
+        )}
+      </div>
 
-            {/* Footer / Approval Actions */}
-            <div className="bg-card border-t border-border p-5 flex items-center justify-between rounded-b-2xl">
-              <button
-                type="button"
-                onClick={closeInspectPapers}
-                className="px-5 py-2.5 rounded-lg font-medium text-muted-foreground hover:bg-muted transition-colors text-sm"
-              >
-                Close
-              </button>
-
-              <div className="flex gap-3">
-                {inspectingListing.paperVerified ? (
-                  <button
-                    type="button"
-                    disabled={actionLoading === inspectingListing._id}
-                    onClick={() => togglePaperVerification(inspectingListing, false)}
-                    className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/20 px-5 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {actionLoading === inspectingListing._id ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <XCircle size={16} />
-                    )}
-                    Revoke Verification
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={actionLoading === inspectingListing._id}
-                    onClick={() => togglePaperVerification(inspectingListing, true)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
-                  >
-                    {actionLoading === inspectingListing._id ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <ShieldCheck size={18} />
-                    )}
-                    Approve &amp; Mark Paper Verified
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white border border-white/20 shadow-2xl rounded-2xl px-5 py-3.5 flex items-center gap-3 animate-in slide-in-from-bottom-5 text-sm font-medium">
-          <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
-          <span>{toastMessage}</span>
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="animate-in fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-xl bg-ink-deep p-2.5 pl-4 text-white shadow-pop lg:left-[calc(16rem+1.5rem)]">
+          <p className="mr-auto text-sm font-semibold tabular">{selected.size} selected</p>
+          <BulkButton onClick={() => bulk({ status: "active" }, "{n} listings are live.")} disabled={busy === "bulk"}>Approve</BulkButton>
+          <BulkButton onClick={() => bulk({ status: "sold" }, "{n} listings marked sold.")} disabled={busy === "bulk"}>Mark sold</BulkButton>
+          <BulkButton onClick={() => bulk({ status: "removed" }, "{n} listings removed from the site.")} disabled={busy === "bulk"}>Remove</BulkButton>
+          <BulkButton onClick={() => bulk({ featured: true }, "{n} listings featured.")} disabled={busy === "bulk"}>Feature</BulkButton>
+          <BulkButton onClick={() => bulk({ paperVerified: true, paperVerifiedAt: new Date().toISOString() }, "{n} listings marked Paper Verified.")} disabled={busy === "bulk"}>
+            Verify papers
+          </BulkButton>
           <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="p-1 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors ml-2"
+            onClick={() => remove(Array.from(selected), `${selected.size} listings`)}
+            disabled={busy === "bulk"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-destructive px-3 text-sm font-semibold hover:bg-[#a82020] disabled:opacity-50"
           >
-            <X size={14} />
+            <Trash2 size={15} aria-hidden /> Delete
+          </button>
+          <button onClick={() => setSelected(new Set())} className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" aria-label="Clear selection">
+            <X size={18} />
           </button>
         </div>
       )}
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b border-border">
-              <tr className="text-left text-muted-foreground">
-                <th className="px-6 py-4 font-medium">Vehicle</th>
-                <th className="px-6 py-4 font-medium">Seller</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Paper Status</th>
-                <th className="px-6 py-4 font-medium">Featured</th>
-                <th className="px-6 py-4 font-medium">Stats</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {listings.map((listing) => {
-                const docCount = listing.documents?.length || 0;
-                return (
-                  <tr key={listing._id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-bold max-w-[200px] truncate" title={listing.title}>
-                        {listing.title}
-                      </p>
-                      <p className="text-xs text-primary font-bold mt-1">
-                        ৳ {listing.price.toLocaleString()}
-                      </p>
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                        {listing.condition}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium">{listing.sellerId?.name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {listing.sellerId?.role || "-"}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        disabled={actionLoading === listing._id}
-                        value={listing.status}
-                        onChange={(e) => updateListing(listing._id, { status: e.target.value })}
-                        className={`text-xs font-medium px-2 py-1 rounded-md outline-none cursor-pointer ${
-                          statusColor[listing.status] || "bg-gray-500/10 text-gray-600"
-                        }`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="pending">Pending</option>
-                        <option value="sold">Sold</option>
-                        <option value="removed">Removed</option>
-                      </select>
-                    </td>
+      {editing && (
+        <EditListing
+          listing={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            toast.success("Changes saved.");
+            await refreshAll();
+          }}
+        />
+      )}
 
-                    {/* Paper Verification Status with Clear Action Buttons */}
-                    <td className="px-6 py-4">
-                      {listing.paperVerified ? (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
-                            <ShieldCheck size={14} />
-                            <span>Paper Verified</span>
-                          </span>
-                          {docCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => openInspectPapers(listing)}
-                              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md bg-muted/50 hover:bg-muted transition-colors flex items-center gap-1 cursor-pointer"
-                              title="View uploaded car documents"
-                            >
-                              <FileSearch size={12} />
-                              <span>View ({docCount})</span>
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={actionLoading === listing._id}
-                            onClick={() => togglePaperVerification(listing, false)}
-                            className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
-                            title="Revoke paper verification"
-                          >
-                            Revoke
-                          </button>
-                        </div>
-                      ) : docCount > 0 ? (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            disabled={actionLoading === listing._id}
-                            onClick={() => togglePaperVerification(listing, true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50 hover:scale-105 active:scale-95"
-                            title="Click to instantly approve car papers and grant Paper Verified badge"
-                          >
-                            {actionLoading === listing._id ? (
-                              <Loader2 size={13} className="animate-spin" />
-                            ) : (
-                              <ShieldCheck size={14} />
-                            )}
-                            <span>✓ Approve Papers</span>
-                          </button>
+      {inspecting && (
+        <PapersInspector
+          listing={inspecting}
+          onClose={() => setInspecting(null)}
+          onDecision={async (verified, note) => {
+            await patchOne(
+              inspecting,
+              // null (not undefined) so revoking actually clears the date on the server.
+              { paperVerified: verified, paperVerifiedAt: (verified ? new Date().toISOString() : null) as string | undefined, paperVerificationNote: note },
+              verified ? `“${inspecting.title}” is now Paper Verified.` : `Paper Verified removed from “${inspecting.title}”.`
+            );
+            setInspecting(null);
+          }}
+        />
+      )}
 
-                          <button
-                            type="button"
-                            onClick={() => openInspectPapers(listing)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                            title="Click to preview uploaded car papers"
-                          >
-                            <FileSearch size={13} />
-                            <span>{docCount} Doc{docCount > 1 ? "s" : ""}</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
-                          No papers
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <button
-                        disabled={actionLoading === listing._id}
-                        onClick={() => updateListing(listing._id, { featured: !listing.featured })}
-                        className={`p-2 rounded-full transition-colors ${
-                          listing.featured
-                            ? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20"
-                            : "text-muted-foreground hover:bg-muted"
-                        }`}
-                        title={listing.featured ? "Remove Featured" : "Mark Featured"}
-                      >
-                        <Star size={18} className={listing.featured ? "fill-amber-500" : ""} />
-                      </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="flex items-center gap-1 text-muted-foreground font-medium">
-                        <Eye size={14} /> {listing.views.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1">
-                        {/* Inspect Papers */}
-                        {docCount > 0 && (
-                          <button
-                            onClick={() => openInspectPapers(listing)}
-                            className="p-2 text-emerald-600 hover:bg-emerald-500/10 rounded-lg transition-colors"
-                            title="Inspect Car Papers"
-                          >
-                            <FileSearch size={18} />
-                          </button>
-                        )}
-                        {/* Edit Button */}
-                        <button
-                          onClick={() => openEditForm(listing)}
-                          className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                          title="Edit Listing"
-                        >
-                          <Pencil size={18} />
-                        </button>
-                        {/* View on site */}
-                        <Link
-                          href={`/cars/${listing.slug}`}
-                          target="_blank"
-                          className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
-                          title="View on site"
-                        >
-                          <ExternalLink size={18} />
-                        </Link>
-                        {/* Delete */}
-                        <button
-                          disabled={actionLoading === listing._id}
-                          onClick={() => deleteListing(listing._id)}
-                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
-                          title="Delete Listing"
-                        >
-                          {actionLoading === listing._id ? (
-                            <Loader2 size={18} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={18} />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {dialog}
     </div>
+  );
+}
+
+function BulkButton({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button {...props} className="h-9 rounded-lg border border-white/20 px-3 text-sm font-semibold hover:border-white/50 hover:bg-white/10 disabled:opacity-50">
+      {children}
+    </button>
+  );
+}
+
+function StatusSelect({ listing, disabled, onChange }: { listing: Listing; disabled: boolean; onChange: (s: string) => void }) {
+  return (
+    <div className="relative inline-flex items-center">
+      <StatusBadge status={listing.status} />
+      {/* Transparent select over the badge: looks like a pill, behaves like a native dropdown. */}
+      <select
+        value={listing.status}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`Status for ${listing.title}`}
+        className="absolute inset-0 cursor-pointer opacity-0"
+      >
+        {Object.entries(STATUS_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+      </select>
+      {disabled && <Loader2 size={14} className="ml-1.5 animate-spin text-muted-foreground" aria-hidden />}
+    </div>
+  );
+}
+
+function PapersCell({ listing, onInspect, compact }: { listing: Listing; onInspect: () => void; compact?: boolean }) {
+  if (listing.paperVerified) {
+    return (
+      <button onClick={onInspect} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#e3f5ec] px-2.5 py-0.5 text-[13px] font-semibold text-[#0b6b43] hover:ring-1 hover:ring-[#0b6b43]">
+        <ShieldCheck size={14} aria-hidden /> Verified
+      </button>
+    );
+  }
+  if (listing.docCount > 0) {
+    return (
+      <button onClick={onInspect} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-accent px-2.5 py-0.5 text-[13px] font-semibold text-accent-foreground hover:ring-1 hover:ring-accent-foreground">
+        <FileSearch size={14} aria-hidden /> {compact ? `${listing.docCount} to check` : `Check ${listing.docCount} ${listing.docCount === 1 ? "paper" : "papers"}`}
+      </button>
+    );
+  }
+  return <span className="whitespace-nowrap text-[13px] text-muted-foreground">None uploaded</span>;
+}
+
+function RowActions({ listing, busy, onFeature, onEdit, onDelete }: { listing: Listing; busy: boolean; onFeature: () => void; onEdit: () => void; onDelete: () => void }) {
+  const icon = "rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50";
+  return (
+    <div className="flex items-center justify-end gap-0.5">
+      <button onClick={onFeature} disabled={busy} className={icon} aria-label={listing.featured ? "Remove from featured" : "Mark as featured"} title={listing.featured ? "Remove from featured" : "Mark as featured"}>
+        <Star size={17} className={listing.featured ? "fill-marigold text-[#b27c00]" : ""} />
+      </button>
+      <button onClick={onEdit} className={icon} aria-label={`Edit ${listing.title}`} title="Edit">
+        <Pencil size={17} />
+      </button>
+      <Link href={`/cars/${listing.slug}`} target="_blank" className={icon} aria-label={`Open ${listing.title} on the site`} title="Open on site">
+        <ExternalLink size={17} />
+      </Link>
+      <button onClick={onDelete} disabled={busy} className={cn(icon, "hover:bg-[#fde8e8] hover:text-destructive")} aria-label={`Delete ${listing.title}`} title="Delete">
+        <Trash2 size={17} />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Edit ─────────────────────────────────────────── */
+function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    title: listing.title,
+    description: listing.description || "",
+    price: listing.price,
+    condition: listing.condition,
+    status: listing.status,
+    make: listing.make || "",
+    model: listing.model || "",
+    year: listing.year || new Date().getFullYear(),
+    mileage: listing.mileage || 0,
+    fuelType: listing.fuelType || "petrol",
+    transmission: listing.transmission || "manual",
+    engineSize: listing.engineSize || 0,
+    color: listing.color || "",
+    location: listing.location || "",
+    featured: !!listing.featured,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  const save = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!form.title.trim()) return setError("Add a title.");
+    if (!(form.price > 0)) return setError("Price must be more than zero.");
+    setSaving(true);
+    setError("");
+    try {
+      await api("/api/admin/listings", { method: "PATCH", body: JSON.stringify({ id: listing._id, ...form }) });
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+      setSaving(false);
+    }
+  };
+
+  const num = (k: "price" | "year" | "mileage" | "engineSize") => ({
+    type: "number" as const,
+    inputMode: "numeric" as const,
+    value: form[k],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(k, Number(e.target.value)),
+    className: inputClass,
+  });
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Edit listing"
+      description={listing.title}
+      size="lg"
+      footer={
+        <>
+          {error && <p role="alert" className="mr-auto text-sm font-medium text-destructive">{error}</p>}
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={saving} onClick={() => save()}>Save changes</Button>
+        </>
+      }
+    >
+      <form onSubmit={save} className="grid gap-4 sm:grid-cols-6">
+        <div className="sm:col-span-6">
+          <Field label="Title" htmlFor="e-title">
+            <input id="e-title" data-autofocus value={form.title} onChange={(e) => set("title", e.target.value)} className={inputClass} />
+          </Field>
+        </div>
+        <div className="sm:col-span-6">
+          <Field label="Description" htmlFor="e-desc">
+            <textarea id="e-desc" rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} className={cn(inputClass, "h-auto py-2")} />
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Price (taka)" htmlFor="e-price" hint={form.price > 0 ? `${formatTaka(form.price)}, ${formatLakh(form.price)}` : undefined}>
+            <input id="e-price" {...num("price")} />
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Status" htmlFor="e-status">
+            <select id="e-status" value={form.status} onChange={(e) => set("status", e.target.value)} className={inputClass}>
+              {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Condition" htmlFor="e-cond">
+            <select id="e-cond" value={form.condition} onChange={(e) => set("condition", e.target.value)} className={inputClass}>
+              <option value="new">New</option>
+              <option value="used">Used</option>
+              <option value="reconditioned">Reconditioned</option>
+            </select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Make" htmlFor="e-make"><input id="e-make" value={form.make} onChange={(e) => set("make", e.target.value)} className={inputClass} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Model" htmlFor="e-model"><input id="e-model" value={form.model} onChange={(e) => set("model", e.target.value)} className={inputClass} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Year" htmlFor="e-year"><input id="e-year" {...num("year")} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Mileage (km)" htmlFor="e-km"><input id="e-km" {...num("mileage")} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Fuel" htmlFor="e-fuel">
+            <select id="e-fuel" value={form.fuelType} onChange={(e) => set("fuelType", e.target.value)} className={inputClass}>
+              {["petrol", "octane", "hybrid", "diesel", "cng", "electric"].map((f) => <option key={f} value={f}>{f === "cng" ? "CNG" : f[0].toUpperCase() + f.slice(1)}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Transmission" htmlFor="e-trans">
+            <select id="e-trans" value={form.transmission} onChange={(e) => set("transmission", e.target.value)} className={inputClass}>
+              <option value="automatic">Automatic</option>
+              <option value="manual">Manual</option>
+              <option value="semi-automatic">Semi-automatic</option>
+            </select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Engine (cc)" htmlFor="e-cc"><input id="e-cc" {...num("engineSize")} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Colour" htmlFor="e-color"><input id="e-color" value={form.color} onChange={(e) => set("color", e.target.value)} className={inputClass} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Location" htmlFor="e-loc"><input id="e-loc" value={form.location} onChange={(e) => set("location", e.target.value)} className={inputClass} /></Field>
+        </div>
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 sm:col-span-6">
+          <input type="checkbox" checked={form.featured} onChange={(e) => set("featured", e.target.checked)} className="h-[18px] w-[18px] accent-primary" />
+          <span>
+            <span className="block text-sm font-semibold">Featured</span>
+            <span className="block text-sm text-muted-foreground">Shown first in search results and on the home page.</span>
+          </span>
+        </label>
+        <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
+      </form>
+    </Modal>
+  );
+}
+
+/* ─── Papers ───────────────────────────────────────── */
+// Decoded by hand: fetch("data:…") is blocked by the site's connect-src CSP.
+function dataUrlToBlob(dataUrl: string) {
+  const [meta, payload = ""] = dataUrl.split(",", 2);
+  const mime = /data:([^;]+)/.exec(meta)?.[1] || "application/octet-stream";
+  if (!meta.includes(";base64")) return new Blob([decodeURIComponent(payload)], { type: mime });
+  const bin = atob(payload);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+function PapersInspector({
+  listing,
+  onClose,
+  onDecision,
+}: {
+  listing: Listing;
+  onClose: () => void;
+  onDecision: (verified: boolean, note: string) => Promise<void>;
+}) {
+  const [docs, setDocs] = useState<string[] | null>(null);
+  const [urls, setUrls] = useState<string[]>([]);
+  const [active, setActive] = useState(0);
+  const [error, setError] = useState("");
+  const [note, setNote] = useState(listing.paperVerificationNote || "");
+  const [saving, setSaving] = useState(false);
+
+  // Scans are private and can be large, so they're only fetched when the inspector opens.
+  useEffect(() => {
+    let cancelled = false;
+    const created: string[] = [];
+    api<{ documents: string[] }>(`/api/admin/listings?id=${listing._id}&docs=1`)
+      .then(async ({ documents }) => {
+        // Browsers refuse to open data: URLs in a new tab, so convert them to blob URLs.
+        const resolved = await Promise.all(
+          documents.map(async (d) => {
+            if (!d.startsWith("data:")) return d;
+            const u = URL.createObjectURL(dataUrlToBlob(d));
+            created.push(u);
+            return u;
+          })
+        );
+        if (!cancelled) {
+          setDocs(documents);
+          setUrls(resolved);
+        }
+      })
+      .catch((e) => !cancelled && setError((e as Error).message));
+    return () => {
+      cancelled = true;
+      created.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [listing._id]);
+
+  const isPdf = (i: number) => !!docs && (docs[i].startsWith("data:application/pdf") || docs[i].toLowerCase().split("?")[0].endsWith(".pdf"));
+
+  const decide = async (verified: boolean) => {
+    setSaving(true);
+    await onDecision(verified, note.trim());
+    setSaving(false);
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      title="Check car papers"
+      description={
+        <>
+          {listing.title}, listed by {listing.sellerId?.name || "unknown seller"}
+          {listing.sellerId?.phone ? ` (${listing.sellerId.phone})` : ""}
+        </>
+      }
+      footer={
+        listing.paperVerified ? (
+          <>
+            <p className="mr-auto flex items-center gap-1.5 text-sm font-semibold text-verified">
+              <ShieldCheck size={16} aria-hidden /> Verified {listing.paperVerifiedAt ? timeAgo(listing.paperVerifiedAt) : ""}
+            </p>
+            <Button onClick={onClose}>Close</Button>
+            <Button variant="danger" loading={saving} onClick={() => decide(false)}>Remove badge</Button>
+          </>
+        ) : (
+          <>
+            <Button onClick={onClose}>Not now</Button>
+            <Button variant="success" loading={saving} disabled={!docs || docs.length === 0} onClick={() => decide(true)}>
+              <ShieldCheck size={16} /> Mark Paper Verified
+            </Button>
+          </>
+        )
+      }
+    >
+      <p className="mb-4 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+        Only admins can see these files. Buyers only see the Paper Verified badge.
+      </p>
+
+      {error ? (
+        <p role="alert" className="text-destructive">{error}</p>
+      ) : !docs ? (
+        <div className="skeleton h-80 rounded-lg" />
+      ) : docs.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-input p-10 text-center">
+          <FileText size={30} className="mx-auto text-muted-foreground" aria-hidden />
+          <p className="mt-2 font-semibold">No papers uploaded</p>
+          <p className="text-sm text-muted-foreground">Ask the seller to add their registration, tax token and fitness certificate.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
+          <div>
+            <div className="flex h-[min(60vh,32rem)] items-center justify-center overflow-hidden rounded-lg bg-ink-deep">
+              {isPdf(active) ? (
+                <iframe src={urls[active]} title={`Paper ${active + 1}`} className="h-full w-full bg-white" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- private scans, never optimised or cached
+                <img src={urls[active]} alt={`Paper ${active + 1}`} className="max-h-full max-w-full object-contain" />
+              )}
+            </div>
+            <a href={urls[active]} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+              <ExternalLink size={14} aria-hidden /> Open full size
+            </a>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-sm font-semibold">Files ({docs.length})</p>
+              <div className="flex flex-wrap gap-1.5 lg:flex-col">
+                {docs.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActive(i)}
+                    aria-pressed={active === i}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium",
+                      active === i ? "bg-ink text-white" : "bg-muted hover:bg-secondary"
+                    )}
+                  >
+                    {isPdf(i) ? <FileText size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                    Paper {i + 1}
+                    <span className="ml-auto text-xs opacity-75">{isPdf(i) ? "PDF" : "Image"}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Field label="Note for the record" htmlFor="paper-note" hint="Visible to admins only.">
+              <textarea
+                id="paper-note"
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Tax token valid to Dec 2026"
+                className={cn(inputClass, "h-auto py-2")}
+              />
+            </Field>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

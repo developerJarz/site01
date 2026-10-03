@@ -133,7 +133,7 @@ export default function SellCarPage() {
         </p>
         <button
           onClick={() => router.push("/login")}
-          className="bg-primary text-white px-8 py-3 rounded-full font-medium shadow-lg shadow-primary/20 hover:bg-primary/90"
+          className="bg-primary text-white px-8 py-3 rounded-full font-medium shadow-card hover:bg-primary/90"
         >
           Sign In / Register
         </button>
@@ -296,7 +296,7 @@ export default function SellCarPage() {
                   step > i + 1
                     ? "bg-green-500 text-white"
                     : step === i + 1
-                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                    ? "bg-primary text-primary-foreground shadow-card"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
@@ -432,7 +432,7 @@ export default function SellCarPage() {
               <button
                 onClick={handleNext}
                 disabled={!formData.make || !formData.model || !formData.year}
-                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20"
+                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-card"
               >
                 Next Step →
               </button>
@@ -538,7 +538,7 @@ export default function SellCarPage() {
               <button
                 onClick={handleNext}
                 disabled={!formData.price || !formData.mileage || !formData.description}
-                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20"
+                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-card"
               >
                 Next Step →
               </button>
@@ -621,7 +621,7 @@ export default function SellCarPage() {
 
               {/* Privacy & Trust Banner */}
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-5 flex items-start gap-3">
-                <ShieldCheck className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                <ShieldCheck className="text-verified flex-shrink-0 mt-0.5" size={20} />
                 <div className="text-xs text-emerald-950 dark:text-emerald-200 space-y-1">
                   <p className="font-semibold flex items-center gap-1">
                     <Lock size={12} /> 100% Confidential &amp; Admin-Only View
@@ -629,7 +629,7 @@ export default function SellCarPage() {
                   <p className="opacity-90">
                     Your car papers are never shown to the public. Only CarHat authorized admins can view these documents to authenticate the car.
                   </p>
-                  <p className="font-medium text-emerald-600 dark:text-emerald-400 pt-0.5">
+                  <p className="font-medium text-verified dark:text-emerald-400 pt-0.5">
                     ✨ Once verified by admin, your listing gets an exclusive <strong>&quot;Paper Verified&quot;</strong> badge to win buyer trust and sell 3x faster!
                   </p>
                 </div>
@@ -682,7 +682,7 @@ export default function SellCarPage() {
                   Registration Smart Card, Tax Token, Fitness Certificate, Route Permit
                 </p>
                 {docFiles.length > 0 && (
-                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
+                  <p className="text-xs font-semibold text-verified dark:text-emerald-400 mt-2">
                     ✓ {docFiles.length} document(s) attached for verification
                   </p>
                 )}
@@ -702,7 +702,7 @@ export default function SellCarPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={imageFiles.length === 0 || loading}
-                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20 flex items-center gap-2"
+                className="bg-primary text-primary-foreground px-8 py-2.5 rounded-lg font-medium disabled:opacity-50 transition-opacity shadow-card flex items-center gap-2"
               >
                 {loading ? (
                   <>
@@ -725,14 +725,14 @@ export default function SellCarPage() {
         {/* ══════ STEP 4: Success ══════ */}
         {step === 4 && (
           <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in-95">
-            <CheckCircle size={80} className="text-green-500 mb-6" />
+            <CheckCircle size={80} className="text-verified mb-6" />
             <h2 className="text-3xl font-bold mb-2">Ad Posted Successfully!</h2>
             <p className="text-muted-foreground mb-4 text-center max-w-md">
               Your car listing for <span className="font-semibold text-foreground">{formData.year} {formData.make} {formData.model}</span> is now published!
             </p>
             {docFiles.length > 0 && (
               <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs px-4 py-3 rounded-xl max-w-md text-center mb-8 flex items-center gap-2">
-                <BadgeCheck className="text-emerald-500 flex-shrink-0" size={20} />
+                <BadgeCheck className="text-verified flex-shrink-0" size={20} />
                 <span>Our team is reviewing your uploaded papers. Once verified, the &quot;Paper Verified&quot; badge will be applied automatically!</span>
               </div>
             )}
@@ -745,7 +745,7 @@ export default function SellCarPage() {
               </button>
               <button
                 onClick={() => router.push("/cars")}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors"
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-card hover:bg-primary/90 transition-colors"
               >
                 View All Cars
               </button>

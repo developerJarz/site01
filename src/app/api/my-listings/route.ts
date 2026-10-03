@@ -18,6 +18,7 @@ export async function GET() {
     const userId = (session.user as any).id;
 
     const listings = await Listing.find({ sellerId: userId })
+      .select({ documents: 0, images: { $slice: 1 } })
       .sort({ createdAt: -1 })
       .lean();
 

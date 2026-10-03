@@ -79,7 +79,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
 
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await fetch("/api/settings", { cache: "no-store" });
+      const res = await fetch("/api/settings");
       if (res.ok) {
         const data = await res.json();
         if (data.settings) {
@@ -178,13 +178,21 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
     window.addEventListener("site-settings-updated", handleSettingsUpdated);
     window.addEventListener("storage", handleStorage);
 
-    // Periodic background sync every 15 seconds
-    const interval = setInterval(fetchSettings, 15000);
+    // Re-sync when the visitor comes back to the tab, at most once a minute.
+    // (Admin edits in another tab already arrive instantly through the storage event.)
+    let lastSync = Date.now();
+    const handleVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastSync > 60_000) {
+        lastSync = Date.now();
+        fetchSettings();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisible);
 
     return () => {
       window.removeEventListener("site-settings-updated", handleSettingsUpdated);
       window.removeEventListener("storage", handleStorage);
-      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisible);
     };
   }, [fetchSettings]);
 

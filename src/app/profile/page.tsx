@@ -177,7 +177,7 @@ export default function ProfilePage() {
       <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
           <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-primary/20">
+            <div className="w-24 h-24 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-card">
               {profile.name?.[0] || "U"}
             </div>
             {editing && (
@@ -207,13 +207,13 @@ export default function ProfilePage() {
                 {profile.role}
               </span>
               {profile.isVerified && (
-                <span className="text-green-600 bg-green-500/10 px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+                <span className="text-verified bg-green-500/10 px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
                   <BadgeCheck size={12} />
                   Verified
                 </span>
               )}
               {isDealer && profile.dealershipName && (
-                <span className="text-purple-600 bg-purple-500/10 px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+                <span className="text-teal-ink bg-accent px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
                   <Store size={12} />
                   {profile.dealershipName}
                 </span>
@@ -224,7 +224,7 @@ export default function ProfilePage() {
             {!editing ? (
               <button
                 onClick={() => setEditing(true)}
-                className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card"
               >
                 Edit Profile
               </button>
@@ -253,7 +253,7 @@ export default function ProfilePage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
+                  className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card flex items-center gap-2 disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   {saving ? "Saving..." : "Save"}
@@ -271,7 +271,7 @@ export default function ProfilePage() {
         </div>
       )}
       {success && (
-        <div className="bg-green-500/10 text-green-600 text-sm p-4 rounded-xl mb-6 border border-green-500/20 flex items-center gap-2">
+        <div className="bg-green-500/10 text-verified text-sm p-4 rounded-xl mb-6 border border-green-500/20 flex items-center gap-2">
           <CheckCircle2 size={16} />
           {success}
         </div>
@@ -365,7 +365,7 @@ export default function ProfilePage() {
           {isDealer && (
             <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
               <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-                <Store size={18} className="text-purple-500" />
+                <Store size={18} className="text-teal-ink" />
                 Dealership Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -410,7 +410,7 @@ export default function ProfilePage() {
           {/* Contact & Visibility Settings */}
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-              <Phone size={18} className="text-green-500" />
+              <Phone size={18} className="text-verified" />
               Contact & Visibility Settings
             </h2>
             <div className="space-y-4">
@@ -486,7 +486,7 @@ export default function ProfilePage() {
               </div>
             )}
             {passwordSuccess && (
-              <div className="bg-green-500/10 text-green-600 text-sm p-3 rounded-lg mb-4 border border-green-500/20 flex items-center gap-2">
+              <div className="bg-green-500/10 text-verified text-sm p-3 rounded-lg mb-4 border border-green-500/20 flex items-center gap-2">
                 <CheckCircle2 size={14} />
                 {passwordSuccess}
               </div>
@@ -530,7 +530,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
+                className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card flex items-center gap-2 disabled:opacity-50"
               >
                 {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Key size={16} />}
                 {changingPassword ? "Changing..." : "Change Password"}
@@ -563,7 +563,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Verification</span>
-                <span className={`font-medium ${profile.isVerified ? "text-green-600" : "text-amber-600"}`}>
+                <span className={`font-medium ${profile.isVerified ? "text-verified" : "text-[#7a5200]"}`}>
                   {profile.isVerified ? "Verified" : "Pending"}
                 </span>
               </div>
@@ -604,7 +604,7 @@ export default function ProfilePage() {
           <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               {isDealer ? (
-                <Store size={20} className="text-purple-500" />
+                <Store size={20} className="text-teal-ink" />
               ) : (
                 <UserIcon size={20} className="text-primary" />
               )}

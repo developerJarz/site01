@@ -176,7 +176,7 @@ export default function AdminBlogsPage() {
         </div>
         <button
           onClick={showForm ? closeForm : openCreateForm}
-          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-card"
         >
           {showForm ? <X size={18} /> : <Plus size={18} />}
           {showForm ? "Cancel" : "New Post"}
@@ -308,7 +308,7 @@ export default function AdminBlogsPage() {
               <button
                 onClick={saveBlog}
                 disabled={actionLoading === (editingBlog?._id || "new")}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50"
               >
                 {actionLoading === (editingBlog?._id || "new") ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -331,7 +331,7 @@ export default function AdminBlogsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b border-border">
                 <tr className="text-left text-muted-foreground">
@@ -380,8 +380,8 @@ export default function AdminBlogsPage() {
                       <span
                         className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                           blog.published
-                            ? "bg-green-500/10 text-green-600"
-                            : "bg-amber-500/10 text-amber-600"
+                            ? "bg-green-500/10 text-verified"
+                            : "bg-amber-500/10 text-[#7a5200]"
                         }`}
                       >
                         {blog.published ? "Published" : "Draft"}
@@ -422,7 +422,7 @@ export default function AdminBlogsPage() {
                           className={`p-2 rounded-lg transition-colors ${
                             blog.published
                               ? "text-amber-500 hover:bg-amber-500/10"
-                              : "text-green-500 hover:bg-green-500/10"
+                              : "text-verified hover:bg-green-500/10"
                           }`}
                           title={
                             blog.published ? "Unpublish" : "Publish"

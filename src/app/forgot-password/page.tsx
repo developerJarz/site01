@@ -152,7 +152,7 @@ export default function ForgotPasswordPage() {
               id="send-reset-code-btn"
               type="submit"
               disabled={emailLoading}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {emailLoading ? <Loader2 size={18} className="animate-spin" /> : null}
               {emailLoading ? "Sending..." : "Send Reset Code"}
@@ -230,7 +230,7 @@ export default function ForgotPasswordPage() {
               id="reset-password-btn"
               type="submit"
               disabled={resetLoading}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {resetLoading ? <Loader2 size={18} className="animate-spin" /> : null}
               {resetLoading ? "Resetting..." : "Reset Password"}
@@ -254,7 +254,7 @@ export default function ForgotPasswordPage() {
         {step === "done" && (
           <div className="flex flex-col items-center gap-4">
             <div className="bg-green-500/10 border border-green-500/20 rounded-full p-4">
-              <CheckCircle2 className="text-green-500" size={40} />
+              <CheckCircle2 className="text-verified" size={40} />
             </div>
             <p className="text-sm text-muted-foreground text-center">
               Your password has been reset. You can now sign in with your new password.
@@ -262,7 +262,7 @@ export default function ForgotPasswordPage() {
             <button
               id="go-to-login-btn"
               onClick={() => router.push("/login")}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card"
             >
               Go to Sign In
             </button>

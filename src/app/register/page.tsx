@@ -164,7 +164,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 mt-2"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 mt-2"
             >
               {loading ? "Sending Code..." : "Continue"}
             </button>
@@ -193,7 +193,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading || timeLeft <= 0 || otpCode.length !== 6}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 mt-2"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 mt-2"
             >
               {loading ? "Verifying..." : "Verify & Create Account"}
             </button>

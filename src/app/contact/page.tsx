@@ -111,7 +111,7 @@ export default function ContactPage() {
               <h2 className="text-2xl font-bold mb-6">Send a Message</h2>
               {submitted ? (
                 <div className="py-12 text-center space-y-4">
-                  <div className="w-14 h-14 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto">
+                  <div className="w-14 h-14 bg-green-500/10 text-verified rounded-full flex items-center justify-center mx-auto">
                     <CheckCircle2 size={32} />
                   </div>
                   <h3 className="text-xl font-bold">Message Sent Successfully!</h3>
@@ -178,7 +178,7 @@ export default function ContactPage() {
                   <button
                     type="submit"
                     disabled={sending}
-                    className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-card flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                     {sending ? "Sending..." : "Send Message"}

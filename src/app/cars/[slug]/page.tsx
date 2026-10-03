@@ -1,514 +1,258 @@
-export const dynamic = "force-dynamic";
-
+import { cache } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { BadgeCheck, CalendarDays, Eye, MapPin, ShieldCheck, Check } from "lucide-react";
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
-import { User } from "@/lib/models/User";
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import {
-  MapPin,
-  Calendar,
-  Gauge,
-  Fuel,
-  Settings,
-  ShieldCheck,
-  User as UserIcon,
-  Share2,
-  Heart,
-  Eye,
-  Palette,
-  Zap,
-  ChevronRight,
-  CheckCircle2,
-  Clock,
-  BadgeCheck,
-  Car,
-} from "lucide-react";
+import "@/lib/models/User";
 import { SellerContactCard } from "@/components/SellerContactCard";
-import type { Metadata } from "next";
+import { CarCard, Price, type CarCardData } from "@/components/CarCard";
+import { CarGallery } from "@/components/car/CarGallery";
+import { ShareButton } from "@/components/car/ShareButton";
+import { EmiCalculator } from "@/components/car/EmiCalculator";
+import { escapeRegex, formatKm, formatLakh, formatTaka, listingImageUrl, timeAgo, withServedImages } from "@/lib/utils";
 
-function escapeRegex(str: string) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export const dynamic = "force-dynamic";
 
-// Generate dynamic metadata for SEO
-export async function generateMetadata(props: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
+const LABELS: Record<string, string> = {
+  new: "New", used: "Used", reconditioned: "Reconditioned",
+  petrol: "Petrol", diesel: "Diesel", cng: "CNG", hybrid: "Hybrid", electric: "Electric", octane: "Octane",
+  automatic: "Automatic", manual: "Manual", "semi-automatic": "Semi-automatic",
+};
+const label = (v?: string) => (v ? LABELS[v] || v.charAt(0).toUpperCase() + v.slice(1) : "—");
+
+// Shared by generateMetadata and the page, so the listing is only fetched once per request.
+const getCar = cache(async (slug: string) => {
+  const decoded = decodeURIComponent(slug || "");
+  await connectToDatabase();
+  return (await Listing.findOne({
+    $or: [{ slug: decoded }, { slug }, { slug: { $regex: new RegExp(`^${escapeRegex(decoded)}$`, "i") } }],
+  })
+    .select({ documents: 0 })
+    .populate("sellerId", "name role isVerified dealershipName city createdAt")
+    .lean()) as any;
+});
+
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
-  const decodedSlug = decodeURIComponent(slug || "");
-  const escaped = escapeRegex(decodedSlug);
   try {
-    await connectToDatabase();
-    const car = (await Listing.findOne({
-      $or: [
-        { slug: decodedSlug },
-        { slug: slug },
-        { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
-      ],
-    }).lean()) as any;
+    const car = await getCar(slug);
     if (car) {
+      const description = car.description?.substring(0, 160);
+      const cover = listingImageUrl(car._id, car.images?.[0]);
       return {
-        title: `${car.title} — ৳${car.price?.toLocaleString()} | CarHat.bd`,
-        description: car.description?.substring(0, 160),
-        openGraph: {
-          title: car.title,
-          description: car.description?.substring(0, 160),
-          images: car.images?.[0] ? [car.images[0]] : [],
-        },
+        title: `${car.title}, ${formatLakh(car.price)}`,
+        description,
+        openGraph: { title: car.title, description, images: cover ? [cover] : [] },
       };
     }
   } catch {}
-  return { title: "Car Details | CarHat.bd" };
+  return { title: "Car details" };
 }
 
-export default async function CarDetailsPage(props: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function CarDetailsPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
-  const decodedSlug = decodeURIComponent(slug || "");
-  const escaped = escapeRegex(decodedSlug);
-
-  const query = {
-    $or: [
-      { slug: decodedSlug },
-      { slug: slug },
-      { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
-    ],
-  };
 
   let car: any = null;
-  let relatedCars: any[] = [];
+  let related: CarCardData[] = [];
   try {
-    await connectToDatabase();
-    try {
-      car = (await Listing.findOne(query)
-        .populate("sellerId", "name phone email role")
-        .lean()) as any;
-    } catch (popError) {
-      console.error("Populate error, falling back to basic query:", popError);
-      car = (await Listing.findOne(query).lean()) as any;
-    }
-
-    // Fetch related cars (same make, exclude current)
+    car = await getCar(slug);
     if (car) {
-      relatedCars = (await Listing.find({
-        make: car.make,
-        _id: { $ne: car._id },
-        status: "active",
-      })
-        .limit(4)
-        .select("title slug price images condition year mileage location")
-        .lean()) as any[];
-
-      // If less than 4, fill with other active listings
-      if (relatedCars.length < 4) {
-        const moreIds = [car._id, ...relatedCars.map((c: any) => c._id)];
-        const more = (await Listing.find({
-          _id: { $nin: moreIds },
-          status: "active",
-        })
-          .limit(4 - relatedCars.length)
-          .select("title slug price images condition year mileage location")
-          .lean()) as any[];
-        relatedCars = [...relatedCars, ...more];
-      }
+      const fields = {
+        title: 1, slug: 1, price: 1, make: 1, year: 1, mileage: 1, fuelType: 1, transmission: 1,
+        condition: 1, location: 1, featured: 1, paperVerified: 1, images: { $slice: 1 },
+      };
+      const [sameMake, others] = await Promise.all([
+        Listing.find({ make: car.make, _id: { $ne: car._id }, status: "active" }).select(fields).limit(4).lean(),
+        Listing.find({ make: { $ne: car.make }, status: "active" }).select(fields).sort({ views: -1 }).limit(4).lean(),
+      ]);
+      related = JSON.parse(JSON.stringify([...sameMake, ...others].slice(0, 4).map(withServedImages)));
+      // Count the view without making the visitor wait for the write.
+      Listing.updateOne({ _id: car._id }, { $inc: { views: 1 } }).exec().catch(() => {});
     }
   } catch (error) {
     console.error("Failed to fetch car details:", error);
   }
 
-  if (!car) {
-    notFound();
-  }
-
-  // Increment view counter (fire-and-forget)
-  try {
-    Listing.updateOne({ _id: car._id }, { $inc: { views: 1 } }).exec();
-  } catch {}
+  if (!car) notFound();
 
   const seller = car.sellerId as any;
-  const currentViews = (car.views || 0) + 1;
+  const images: string[] = (car.images || []).map((src: string, i: number) => listingImageUrl(car._id, src, i));
+  const views = (car.views || 0) + 1;
+  const isSold = car.status === "sold";
 
-  const conditionBadgeClass =
-    car.condition === "new"
-      ? "badge-new"
-      : car.condition === "reconditioned"
-        ? "badge-reconditioned"
-        : "badge-used";
-
-  const specItems = [
-    { icon: Calendar, label: "Year", value: car.year, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { icon: Gauge, label: "Mileage", value: `${car.mileage?.toLocaleString() || "N/A"} km`, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { icon: Fuel, label: "Fuel", value: car.fuelType, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { icon: Settings, label: "Transmission", value: car.transmission, color: "text-violet-500", bg: "bg-violet-500/10" },
-    { icon: Zap, label: "Engine", value: `${car.engineSize} cc`, color: "text-pink-500", bg: "bg-pink-500/10" },
-    { icon: ShieldCheck, label: "Condition", value: car.condition, color: "text-teal-500", bg: "bg-teal-500/10" },
-    { icon: Palette, label: "Color", value: car.color, color: "text-orange-500", bg: "bg-orange-500/10" },
-    { icon: Eye, label: "Views", value: currentViews.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-500/10" },
+  const specs = [
+    { label: "Year", value: car.year },
+    { label: "Mileage", value: formatKm(car.mileage) },
+    { label: "Fuel", value: label(car.fuelType) },
+    { label: "Transmission", value: label(car.transmission) },
+    { label: "Engine", value: car.engineSize ? `${Number(car.engineSize).toLocaleString("en-IN")} cc` : "—" },
+    { label: "Condition", value: label(car.condition) },
+    { label: "Colour", value: car.color ? car.color.charAt(0).toUpperCase() + car.color.slice(1) : "—" },
+    { label: "Make and model", value: [car.make, car.model].filter(Boolean).join(" ") || "—" },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-        <Link
-          href="/"
-          className="hover:text-primary transition-colors font-medium"
-        >
-          Home
-        </Link>
-        <ChevronRight size={14} className="text-muted-foreground/50" />
-        <Link
-          href="/cars"
-          className="hover:text-primary transition-colors font-medium"
-        >
-          Cars
-        </Link>
-        <ChevronRight size={14} className="text-muted-foreground/50" />
-        <span className="text-foreground font-semibold truncate max-w-[200px]">
-          {car.title}
-        </span>
+    <div className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-16">
+      <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
+        <ol className="flex min-w-0 items-center gap-2">
+          <li><Link href="/" className="hover:text-primary">Home</Link></li>
+          <li aria-hidden>/</li>
+          <li><Link href="/cars" className="hover:text-primary">Cars</Link></li>
+          {car.make && (
+            <>
+              <li aria-hidden>/</li>
+              <li><Link href={`/cars?make=${encodeURIComponent(car.make)}`} className="hover:text-primary">{car.make}</Link></li>
+            </>
+          )}
+        </ol>
       </nav>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left Column – Images & Specs */}
-        <div className="w-full lg:w-2/3 space-y-6">
-          {/* Main Image Gallery */}
-          <div className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm">
-            <div className="relative h-[400px] md:h-[520px] w-full bg-gradient-to-br from-gray-900 to-gray-950">
-              <img
-                src={
-                  car.images?.[0] ||
-                  "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200"
-                }
-                alt={car.title}
-                className="w-full h-full object-contain"
-              />
-              {/* Top gradient overlay */}
-              <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
-              {/* Bottom gradient overlay */}
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent" />
+      <header className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-semiwide text-2xl font-extrabold leading-tight sm:text-3xl md:text-4xl">{car.title}</h1>
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><MapPin size={16} className="text-teal-ink" aria-hidden /> {car.location}</span>
+            <span className="inline-flex items-center gap-1.5"><CalendarDays size={16} aria-hidden /> Listed {timeAgo(car.createdAt)}</span>
+            <span className="inline-flex items-center gap-1.5 tabular"><Eye size={16} aria-hidden /> {views.toLocaleString("en-IN")} views</span>
+          </p>
+        </div>
+        <ShareButton title={car.title} />
+      </header>
 
-              {/* Condition Badge */}
-              <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-                <span
-                  className={`${conditionBadgeClass} px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-sm`}
-                >
-                  {car.condition}
+      {isSold && (
+        <p className="mt-5 rounded-lg border border-[#f1d898] bg-[#fdf3dc] px-4 py-3 font-semibold text-[#7a5200]">
+          This car has been sold. Similar cars are listed below.
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="min-w-0 space-y-8">
+          <CarGallery images={images} title={car.title}>
+            <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-2">
+              {car.paperVerified && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-verified px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm">
+                  <ShieldCheck size={16} aria-hidden /> Paper Verified
                 </span>
-                {car.paperVerified && (
-                  <span className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 backdrop-blur-sm">
-                    <ShieldCheck size={14} /> Paper Verified
-                  </span>
-                )}
-                {car.featured && (
-                  <span className="bg-primary text-white px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-primary/30">
-                    Featured
-                  </span>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="absolute top-4 right-4 flex gap-2">
-                <button
-                  className="bg-white/15 backdrop-blur-md text-white p-2.5 rounded-full hover:bg-white/25 transition-all shadow-lg border border-white/20"
-                  title="Save"
-                >
-                  <Heart size={18} />
-                </button>
-                <button
-                  className="bg-white/15 backdrop-blur-md text-white p-2.5 rounded-full hover:bg-white/25 transition-all shadow-lg border border-white/20"
-                  title="Share"
-                >
-                  <Share2 size={18} />
-                </button>
-              </div>
-
-              {/* Image Counter */}
-              {car.images && car.images.length > 0 && (
-                <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border border-white/10">
-                  <Eye size={12} />
-                  {car.images.length}{" "}
-                  {car.images.length === 1 ? "Photo" : "Photos"}
-                </div>
+              )}
+              {car.featured && (
+                <span className="rounded-md bg-marigold px-2.5 py-1.5 text-sm font-semibold text-foreground shadow-sm">Featured</span>
               )}
             </div>
-            {/* Thumbnails (if multiple) */}
-            {car.images && car.images.length > 1 && (
-              <div className="flex overflow-x-auto p-3 gap-3 bg-muted/20 border-t border-border">
-                {car.images.map((img: string, i: number) => (
-                  <img
-                    key={i}
-                    src={img}
-                    alt={`View ${i + 1}`}
-                    className="h-20 w-32 object-cover rounded-xl border-2 border-transparent hover:border-primary cursor-pointer transition-all flex-shrink-0 shadow-sm"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          </CarGallery>
 
-          {/* Core Specs Grid */}
-          <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <Car size={20} className="text-primary" />
-              Vehicle Overview
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {specItems.map((spec) => (
-                <div
-                  key={spec.label}
-                  className="flex flex-col items-center text-center p-4 bg-muted/20 rounded-xl border border-border/50 hover:border-primary/20 transition-colors card-hover"
-                >
-                  <div
-                    className={`w-10 h-10 ${spec.bg} rounded-xl flex items-center justify-center mb-2.5`}
-                  >
-                    <spec.icon size={18} className={spec.color} />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground mb-0.5 uppercase tracking-wider font-medium">
-                    {spec.label}
-                  </span>
-                  <span className="font-bold text-sm capitalize">
-                    {spec.value}
-                  </span>
+          <section aria-labelledby="specs-heading">
+            <h2 id="specs-heading" className="text-xl font-bold">Key details</h2>
+            <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+              {specs.map((s) => (
+                <div key={s.label} className="bg-card px-4 py-3.5">
+                  <dt className="text-sm text-muted-foreground">{s.label}</dt>
+                  <dd className="mt-0.5 font-semibold tabular">{s.value}</dd>
                 </div>
               ))}
-            </div>
-          </div>
+            </dl>
+          </section>
 
-          {/* Description */}
-          <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Clock size={20} className="text-primary" />
-              Description
-            </h2>
-            <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground text-[15px]">
-                {car.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Features */}
-          {car.features && car.features.length > 0 && (
-            <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
-              <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
-                <CheckCircle2 size={20} className="text-primary" />
-                Features & Equipment
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                {car.features.map((feature: string, i: number) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 text-sm p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl"
-                  >
-                    <CheckCircle2
-                      size={15}
-                      className="text-emerald-500 flex-shrink-0"
-                    />
-                    <span className="font-medium">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {car.description && (
+            <section aria-labelledby="desc-heading">
+              <h2 id="desc-heading" className="text-xl font-bold">From the seller</h2>
+              <p className="mt-3 max-w-[70ch] whitespace-pre-line text-[17px] leading-relaxed text-foreground/90">{car.description}</p>
+            </section>
           )}
+
+          {car.features?.length > 0 && (
+            <section aria-labelledby="features-heading">
+              <h2 id="features-heading" className="text-xl font-bold">Features</h2>
+              <ul className="mt-4 grid gap-x-6 gap-y-2.5 sm:grid-cols-2 md:grid-cols-3">
+                {car.features.map((f: string) => (
+                  <li key={f} className="flex items-center gap-2.5 text-[15px]">
+                    <Check size={16} className="shrink-0 text-teal-ink" strokeWidth={2.75} aria-hidden /> {f}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section
+            aria-labelledby="papers-heading"
+            className={car.paperVerified ? "rounded-xl border border-[#b5e2cb] bg-[#effaf4] p-5" : "rounded-xl border border-border bg-card p-5"}
+          >
+            <h2 id="papers-heading" className="flex items-center gap-2 text-lg font-bold">
+              <ShieldCheck size={20} className={car.paperVerified ? "text-verified" : "text-muted-foreground"} aria-hidden />
+              {car.paperVerified ? "Papers checked by CarHat" : "Papers not checked yet"}
+            </h2>
+            <p className="mt-2 max-w-[65ch] text-[15px] leading-relaxed text-muted-foreground">
+              {car.paperVerified
+                ? "Our team has reviewed the registration certificate, tax token and fitness certificate the seller uploaded. Still see the originals in person before you pay."
+                : "The seller hasn't had their documents checked by CarHat. Ask to see the registration certificate, tax token and fitness certificate before you pay."}
+            </p>
+          </section>
         </div>
 
-        {/* Right Column – Price & Seller (Sticky) */}
-        <div className="w-full lg:w-1/3">
-          <div className="sticky top-24 space-y-5">
-            {/* Price Box — Premium Card */}
-            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-              {/* Accent gradient bar */}
-              <div className="h-1.5 bg-gradient-to-r from-primary via-pink-500 to-amber-500" />
-              <div className="p-6">
-                <h1 className="text-xl font-bold mb-1.5 leading-tight">
-                  {car.title}
-                </h1>
-                <p className="text-muted-foreground flex items-center gap-1.5 text-sm mb-5">
-                  <MapPin size={14} /> {car.location}
-                </p>
+        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+          <div id="contact" className="scroll-mt-24 rounded-xl border border-border bg-card p-5 shadow-card">
+            <p className="text-sm text-muted-foreground">Asking price</p>
+            <Price value={car.price} size="lg" className="mt-1" />
+            <p className="mt-2 text-sm text-muted-foreground tabular">{formatTaka(car.price)}</p>
 
-                {/* Price — Big, Clear, Readable */}
-                <div className="bg-gradient-to-br from-primary/5 via-transparent to-pink-500/5 border border-primary/10 rounded-xl p-5 mb-5">
-                  <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-medium">
-                    Asking Price
-                  </p>
-                  <div className="price-tag text-4xl md:text-[2.75rem] text-primary leading-none">
-                    ৳ {car.price?.toLocaleString("en-IN")}
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-border/50">
-                    <p className="text-sm text-muted-foreground price-display">
-                      EMI from{" "}
-                      <span className="font-bold text-foreground">
-                        ৳{" "}
-                        {Math.round((car.price || 0) / 60).toLocaleString(
-                          "en-IN"
-                        )}
-                      </span>
-                      /month{" "}
-                      <span className="text-xs">(approx. 5yr)</span>
-                    </p>
-                  </div>
-                </div>
-
-                <SellerContactCard
-                  listingId={car._id.toString()}
-                  sellerId={seller?._id?.toString() || ""}
-                  carTitle={car.title}
-                />
-              </div>
-            </div>
-
-            {/* Paper Verified Trust Banner (When Verified by Admin) */}
-            {car.paperVerified && (
-              <div className="bg-emerald-500/10 border-2 border-emerald-500/30 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-3 mb-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
-                    <ShieldCheck size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-emerald-950 dark:text-emerald-200">
-                      Car Papers Verified
-                    </h3>
-                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                      Authenticity Checked by CarHat.bd
-                    </p>
-                  </div>
-                </div>
-                <ul className="text-xs text-emerald-900/80 dark:text-emerald-200/80 space-y-1.5 pt-1 border-t border-emerald-500/20">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    <span>Registration Smart Card verified</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    <span>Fitness Certificate &amp; Tax Token authenticated</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    <span>Clean document history &amp; legitimate seller</span>
-                  </li>
-                </ul>
+            {!isSold && (
+              <div className="mt-5">
+                <SellerContactCard listingId={car._id.toString()} sellerId={seller?._id?.toString() || ""} carTitle={car.title} />
               </div>
             )}
 
-            {/* Seller Info Card */}
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-              <h3 className="font-bold text-base mb-4 flex items-center gap-2">
-                <UserIcon size={16} className="text-primary" />
-                Seller Information
-              </h3>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-primary to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-primary/20">
-                  <span className="text-white text-xl font-bold">
-                    {(seller?.name || "P")[0]}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-bold text-base flex items-center gap-1.5">
-                    {seller?.name || "Private Seller"}
-                    <BadgeCheck
-                      size={16}
-                      className="text-blue-500 fill-blue-500/20"
-                    />
+            {seller && (
+              <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-lg font-bold text-white">
+                  {(seller.dealershipName || seller.name || "S")[0].toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 truncate font-semibold">
+                    {seller.dealershipName || seller.name}
+                    {seller.isVerified && <BadgeCheck size={17} className="shrink-0 text-primary" aria-label="Verified account" />}
                   </p>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {seller?.role || "Individual"}
+                  <p className="text-sm text-muted-foreground">
+                    {seller.role === "dealer" ? "Dealer" : "Private seller"}
+                    {seller.createdAt && `, on CarHat since ${new Date(seller.createdAt).getFullYear()}`}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500 bg-green-500/10 p-3 rounded-xl border border-green-500/20">
-                <ShieldCheck size={16} />
-                <span className="font-medium">Verified Member</span>
-              </div>
-            </div>
-
-            {/* Safety Tips */}
-            <div className="bg-amber-500/5 border border-amber-500/15 rounded-2xl p-5">
-              <h3 className="font-bold text-amber-700 dark:text-amber-400 mb-3 text-sm flex items-center gap-2">
-                <ShieldCheck size={16} />
-                Safety Tips
-              </h3>
-              <ul className="text-sm text-amber-900/70 dark:text-amber-200/70 space-y-2 list-none">
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-500 mt-0.5">•</span>
-                  Never pay in advance to a seller you do not know.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-500 mt-0.5">•</span>
-                  Meet the seller in a safe, public location.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-500 mt-0.5">•</span>
-                  Have the vehicle inspected by a trusted mechanic.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-500 mt-0.5">•</span>
-                  Verify documents before completing the transaction.
-                </li>
-              </ul>
-            </div>
+            )}
           </div>
-        </div>
+
+          {!isSold && car.price > 0 && <EmiCalculator price={car.price} />}
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-base font-bold">Before you pay</h2>
+            <ul className="mt-3 space-y-2 text-[15px] text-muted-foreground">
+              <li>Don&apos;t send an advance to a seller you haven&apos;t met.</li>
+              <li>Meet in daylight, somewhere public.</li>
+              <li>Have a mechanic you trust inspect the car.</li>
+              <li>Match the chassis number with the registration papers.</li>
+            </ul>
+          </div>
+        </aside>
       </div>
 
-      {/* Related Cars */}
-      {relatedCars.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Car size={22} className="text-primary" />
-            You May Also Like
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {relatedCars.map((related: any) => {
-              const relCondClass =
-                related.condition === "new"
-                  ? "badge-new"
-                  : related.condition === "reconditioned"
-                    ? "badge-reconditioned"
-                    : "badge-used";
-              return (
-                <Link
-                  key={related._id.toString()}
-                  href={`/cars/${related.slug}`}
-                  className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-all group card-hover flex flex-col"
-                >
-                  <div className="relative h-40 overflow-hidden bg-muted">
-                    <div
-                      className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500"
-                      style={{
-                        backgroundImage: `url(${related.images?.[0] || "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600"})`,
-                      }}
-                    />
-                    <div className="absolute top-2 right-2">
-                      <span
-                        className={`${relCondClass} px-2 py-0.5 rounded-full text-[10px] font-bold uppercase backdrop-blur-sm`}
-                      >
-                        {related.condition}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 flex-grow flex flex-col">
-                    <h3 className="font-bold text-sm leading-tight group-hover:text-primary transition-colors mb-1.5 line-clamp-2">
-                      {related.title}
-                    </h3>
-                    <p className="price-tag text-lg text-primary mb-2">
-                      ৳ {related.price?.toLocaleString("en-IN")}
-                    </p>
-                    <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{related.year}</span>
-                      <span>•</span>
-                      <span>
-                        {related.mileage?.toLocaleString()} km
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+      {related.length > 0 && (
+        <section aria-labelledby="related-heading" className="defer-render mt-16">
+          <h2 id="related-heading" className="font-semiwide text-2xl font-extrabold">You might also like</h2>
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {related.map((c) => (
+              <CarCard key={c._id} car={c} sizes="(min-width: 1024px) 18rem, (min-width: 640px) 45vw, 92vw" />
+            ))}
           </div>
+        </section>
+      )}
+
+      {/* Phones: keep price and the contact action in reach while scrolling. */}
+      {!isSold && (
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-4 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md lg:hidden">
+          <Price value={car.price} size="sm" />
+          <a href="#contact" className="rounded-lg bg-primary px-5 py-3 text-[15px] font-semibold text-primary-foreground">
+            Contact seller
+          </a>
         </div>
       )}
     </div>

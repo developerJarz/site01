@@ -7,6 +7,7 @@ import { Favorite } from "@/lib/models/Favorite";
 import { Review } from "@/lib/models/Review";
 import { Blog } from "@/lib/models/Blog";
 import { User } from "@/lib/models/User";
+import { listingImageUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export async function GET() {
     const profileCompleteness = Math.round((filledFields.length / profileFields.length) * 100);
 
     // Fetch user's listings
+    // Cover photo and first paper only: enough to render the list and know papers exist.
     const myListings = await Listing.find({ sellerId: userId })
+      .select({ description: 0, features: 0, images: { $slice: 1 }, documents: { $slice: 1 } })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -63,7 +66,7 @@ export async function GET() {
       price: l.price,
       status: l.status,
       views: l.views,
-      images: l.images,
+      images: l.images?.length ? [listingImageUrl((l as any)._id, l.images[0])] : [],
       condition: l.condition,
       paperVerified: !!(l as any).paperVerified,
       hasDocuments: !!(l.documents && l.documents.length > 0),

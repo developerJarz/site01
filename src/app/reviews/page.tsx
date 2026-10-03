@@ -82,7 +82,7 @@ export default function ReviewsPage() {
                     <Star
                       key={s}
                       size={16}
-                      className={s < review.rating ? "fill-amber-500 text-amber-500" : "text-gray-300"}
+                      className={s < review.rating ? "fill-amber-500 text-amber-500" : "text-muted-foreground"}
                     />
                   ))}
                 </div>
@@ -107,7 +107,7 @@ export default function ReviewsPage() {
               <p className="text-muted-foreground mb-4 max-w-md">
                 Bought or sold a car through CarHat.bd? We&apos;d love to hear about your experience.
               </p>
-              <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+              <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-card">
                 Write a Review
               </button>
             </div>

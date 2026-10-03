@@ -20,6 +20,7 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
   
   const [phoneVisible, setPhoneVisible] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
+  const [chatError, setChatError] = useState("");
 
   useEffect(() => {
     fetch(`/api/seller-contact?listingId=${listingId}`)
@@ -38,10 +39,11 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
 
   const handleStartChat = async () => {
     if (!session) {
-      router.push("/login");
+      router.push(`/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 
+    setChatError("");
     setStartingChat(true);
     try {
       const res = await fetch("/api/conversations", {
@@ -53,13 +55,13 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
       const data = await res.json();
       if (data.conversationId) {
         router.push(`/dashboard/messages?conversation=${data.conversationId}`);
-      } else if (data.error) {
-        alert(data.error);
+      } else {
+        setChatError(data.error || "Couldn't open the chat. Try again.");
         setStartingChat(false);
       }
     } catch (err) {
       console.error("Failed to start chat", err);
-      alert("Something went wrong");
+      setChatError("Couldn't reach CarHat. Check your connection and try again.");
       setStartingChat(false);
     }
   };
@@ -79,8 +81,8 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
   if (loading) {
     return (
       <div className="space-y-3">
-        <div className="w-full h-12 bg-muted animate-pulse rounded-xl"></div>
-        <div className="w-full h-12 bg-muted animate-pulse rounded-xl"></div>
+        <div className="skeleton h-12 w-full rounded-lg" />
+        <div className="skeleton h-12 w-full rounded-lg" />
       </div>
     );
   }
@@ -88,27 +90,30 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
   return (
     <div className="space-y-3">
       {/* Phone Button */}
-      {sellerData?.showPhone && (
-        <button
-          onClick={() => setPhoneVisible(true)}
-          className={`w-full py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors ${
-            phoneVisible
-              ? "bg-muted text-foreground cursor-default border border-border"
-              : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
-          }`}
-        >
-          <Phone size={20} />
-          {phoneVisible ? sellerData.phone : "Show Phone Number"}
-        </button>
-      )}
+      {sellerData?.showPhone &&
+        (phoneVisible ? (
+          <a
+            href={`tel:${sellerData.phone}`}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-primary bg-card py-3 font-semibold text-primary tabular"
+          >
+            <Phone size={19} aria-hidden /> Call {sellerData.phone}
+          </a>
+        ) : (
+          <button
+            onClick={() => setPhoneVisible(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-[#0a4594]"
+          >
+            <Phone size={19} aria-hidden /> Show phone number
+          </button>
+        ))}
 
       {/* WhatsApp Button */}
       {sellerData?.showWhatsApp && (
         <button
           onClick={handleWhatsApp}
-          className="w-full bg-[#25D366] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-[#20b858] transition-colors shadow-lg shadow-green-500/20"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#075e54] py-3 font-semibold text-white transition-colors hover:bg-[#054d45]"
         >
-          <MessageCircle size={20} /> WhatsApp Seller
+          <MessageCircle size={19} aria-hidden /> WhatsApp the seller
         </button>
       )}
 
@@ -117,15 +122,20 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
         <button
           onClick={handleStartChat}
           disabled={startingChat}
-          className="w-full bg-secondary text-secondary-foreground py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-secondary/80 transition-colors disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-card py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
         >
           {startingChat ? (
             <Loader2 size={20} className="animate-spin" />
           ) : (
             <MessageSquare size={20} />
           )}
-          {startingChat ? "Opening Chat..." : "Chat with Seller"}
+          {startingChat ? "Opening chat…" : session ? "Message the seller" : "Sign in to message the seller"}
         </button>
+      )}
+      {chatError && (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {chatError}
+        </p>
       )}
     </div>
   );

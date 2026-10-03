@@ -20,6 +20,23 @@ import {
 } from "lucide-react";
 import { useSiteSettings, DEFAULT_SETTINGS, SiteSettingsState } from "@/context/SiteSettingsContext";
 
+function ToggleSwitch({ enabled, onChange, label }: { enabled: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
+      onClick={() => onChange(!enabled)}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-primary" : "bg-input"}`}
+    >
+      <span
+        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${enabled ? "translate-x-5" : ""}`}
+      />
+    </button>
+  );
+}
+
 export default function AdminSettingsPage() {
   const { settings: globalSettings, updateLiveSettings } = useSiteSettings();
   const [formData, setFormData] = useState<SiteSettingsState>(DEFAULT_SETTINGS);
@@ -96,32 +113,10 @@ export default function AdminSettingsPage() {
     );
   }
 
-  const ToggleSwitch = ({
-    enabled,
-    onChange,
-  }: {
-    enabled: boolean;
-    onChange: (v: boolean) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() => onChange(!enabled)}
-      className={`relative w-12 h-6 rounded-full transition-colors ${
-        enabled ? "bg-primary" : "bg-muted-foreground/30"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          enabled ? "translate-x-6" : ""
-        }`}
-      />
-    </button>
-  );
-
   return (
     <div className="space-y-8 max-w-5xl pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-16 z-20 bg-background/90 backdrop-blur-md py-3 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-14 lg:top-0 z-20 bg-background/90 backdrop-blur-md py-3 border-b border-border/50">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Marketplace Settings</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -130,14 +125,14 @@ export default function AdminSettingsPage() {
         </div>
         <div className="flex items-center gap-3">
           {saved && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+            <span className="text-xs text-verified dark:text-emerald-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
               <CheckCircle2 size={16} /> Real-time Synced!
             </span>
           )}
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 active:scale-95"
+            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-card disabled:opacity-50 active:scale-95"
           >
             {saving ? (
               <Loader2 size={18} className="animate-spin" />
@@ -155,7 +150,7 @@ export default function AdminSettingsPage() {
         <div
           className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-2 ${
             saved
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+              ? "bg-emerald-500/10 text-verified dark:text-emerald-400 border-emerald-500/20"
               : "bg-destructive/10 text-destructive border-destructive/20"
           }`}
         >
@@ -255,13 +250,13 @@ export default function AdminSettingsPage() {
       {/* ──── 2. Social Media Links (Real-time Synced) ──── */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
-            <Share2 size={20} className="text-indigo-500" />
+          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
+            <Share2 size={20} className="text-teal-ink" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-lg">Social Media Links</h2>
-              <span className="px-2 py-0.5 text-[10px] uppercase font-extrabold bg-indigo-500/15 text-indigo-500 rounded-full">
+              <span className="px-2 py-0.5 text-[10px] uppercase font-extrabold bg-accent text-teal-ink rounded-full">
                 Real-Time Live Sync
               </span>
             </div>
@@ -416,7 +411,7 @@ export default function AdminSettingsPage() {
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
           <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-            <Car size={20} className="text-emerald-500" />
+            <Car size={20} className="text-verified" />
           </div>
           <div>
             <h2 className="font-bold text-lg">Listing Policies & Limits</h2>
@@ -478,8 +473,8 @@ export default function AdminSettingsPage() {
       {/* ──── 5. SEO Defaults ──── */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center">
-            <Search size={20} className="text-purple-500" />
+          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
+            <Search size={20} className="text-teal-ink" />
           </div>
           <div>
             <h2 className="font-bold text-lg">SEO & Meta Configuration</h2>

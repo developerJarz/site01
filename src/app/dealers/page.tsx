@@ -62,7 +62,7 @@ export default function DealersPage() {
           </p>
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors shadow-card"
           >
             Register as Dealer <ArrowRight size={18} />
           </Link>
@@ -127,7 +127,7 @@ export default function DealersPage() {
                 <button
                   className={`w-full py-3 rounded-xl font-bold transition-colors ${
                     plan.highlighted
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-card"
                       : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                   }`}
                 >

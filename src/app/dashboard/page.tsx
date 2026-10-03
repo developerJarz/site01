@@ -108,8 +108,8 @@ export default function DashboardPage() {
   const stats = data?.stats || { total: 0, active: 0, sold: 0, pending: 0, totalViews: 0 };
 
   const statusColor: Record<string, string> = {
-    active: "bg-green-500/10 text-green-600",
-    pending: "bg-amber-500/10 text-amber-600",
+    active: "bg-green-500/10 text-verified",
+    pending: "bg-amber-500/10 text-[#7a5200]",
     sold: "bg-blue-500/10 text-blue-600",
     removed: "bg-red-500/10 text-red-600",
   };
@@ -124,8 +124,8 @@ export default function DashboardPage() {
 
   const roleColors: Record<string, string> = {
     buyer: "from-emerald-500 to-teal-600",
-    seller: "from-blue-500 to-indigo-600",
-    dealer: "from-purple-500 to-violet-600",
+    seller: "from-[#0b4fa8] to-[#1596a8]",
+    dealer: "from-[#082f66] to-[#0b4fa8]",
     admin: "from-red-500 to-rose-600",
     guest: "from-gray-400 to-gray-500",
   };
@@ -219,17 +219,17 @@ export default function DashboardPage() {
             <Link href="/admin/listings" className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-2xl p-5 hover:shadow-lg hover:shadow-emerald-500/5 transition-all group">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-10 h-10 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                  <Package size={20} className="text-emerald-500" />
+                  <Package size={20} className="text-verified" />
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <p className="text-3xl font-bold">{data.adminStats.totalListings.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-1">Total Listings</p>
             </Link>
-            <Link href="/admin/blogs" className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-2xl p-5 hover:shadow-lg hover:shadow-purple-500/5 transition-all group">
+            <Link href="/admin/blogs" className="bg-gradient-to-br from-accent to-card border border-[#bfe6ec] rounded-2xl p-5 hover:shadow-lg hover:shadow-lift transition-all group">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-purple-500/15 rounded-xl flex items-center justify-center">
-                  <BookOpen size={20} className="text-purple-500" />
+                <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
+                  <BookOpen size={20} className="text-teal-ink" />
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
         </div>
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center mb-3">
-            <CheckCircle2 size={20} className="text-green-500" />
+            <CheckCircle2 size={20} className="text-verified" />
           </div>
           <p className="text-2xl font-bold">{stats.active}</p>
           <p className="text-xs text-muted-foreground">Active Ads</p>
@@ -264,15 +264,15 @@ export default function DashboardPage() {
           <p className="text-xs text-muted-foreground">Pending</p>
         </div>
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center mb-3">
-            <ShoppingBag size={20} className="text-purple-500" />
+          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center mb-3">
+            <ShoppingBag size={20} className="text-teal-ink" />
           </div>
           <p className="text-2xl font-bold">{stats.sold}</p>
           <p className="text-xs text-muted-foreground">Sold Cars</p>
         </div>
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-pink-500/10 rounded-xl flex items-center justify-center mb-3">
-            <Eye size={20} className="text-pink-500" />
+          <div className="w-10 h-10 bg-[#fdf3dc] rounded-xl flex items-center justify-center mb-3">
+            <Eye size={20} className="text-[#b27c00]" />
           </div>
           <p className="text-2xl font-bold">{stats.totalViews}</p>
           <p className="text-xs text-muted-foreground">Total Views</p>
@@ -386,17 +386,17 @@ export default function DashboardPage() {
           <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                <UserCheck size={20} className="text-emerald-500" />
+                <UserCheck size={20} className="text-verified" />
               </div>
               <div>
                 <p className="text-sm font-semibold">Account Status</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {data?.user?.isVerified ? (
-                    <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                    <span className="text-xs text-verified font-medium flex items-center gap-1">
                       <CheckCircle2 size={12} /> Verified
                     </span>
                   ) : (
-                    <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                    <span className="text-xs text-[#7a5200] font-medium flex items-center gap-1">
                       <AlertCircle size={12} /> Not Verified
                     </span>
                   )}
@@ -424,7 +424,7 @@ export default function DashboardPage() {
 
         {(!data?.recentListings || data.recentListings.length === 0) ? (
           <div className="p-12 text-center">
-            <Car size={48} className="mx-auto text-muted-foreground/30 mb-4" />
+            <Car size={48} className="mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-bold mb-2">No listings yet</h3>
             <p className="text-muted-foreground mb-4">
               {role === "buyer"
@@ -433,7 +433,7 @@ export default function DashboardPage() {
             </p>
             <Link
               href={role === "buyer" ? "/cars" : "/sell"}
-              className="inline-block bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors"
+              className="inline-block bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium shadow-card hover:bg-primary/90 transition-colors"
             >
               {role === "buyer" ? "Browse Cars" : "Post an Ad"}
             </Link>
@@ -462,11 +462,11 @@ export default function DashboardPage() {
                       ৳ {listing.price?.toLocaleString()}
                     </p>
                     {listing.paperVerified ? (
-                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="text-[10px] font-semibold text-verified bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <ShieldCheck size={11} /> Paper Verified
                       </span>
                     ) : listing.hasDocuments ? (
-                      <span className="text-[10px] font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="text-[10px] font-medium text-[#7a5200] bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <Clock size={11} /> Papers Under Review
                       </span>
                     ) : null}

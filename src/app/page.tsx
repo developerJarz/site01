@@ -1,658 +1,407 @@
 import Link from "next/link";
-import {
-  ChevronRight,
-  Star,
-  MapPin,
-  Shield,
-  Search as SearchIcon,
-  MessageSquare,
-  CreditCard,
-  CheckCircle2,
-  ArrowRight,
-  Gauge,
-  Fuel,
-  Quote,
-  Heart,
-  Eye,
-  Camera,
-  Zap,
-  Filter,
-  Lock,
-  TrendingUp,
-  Clock,
-  Users,
-  Award,
-  Car,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, Check, FileText, Phone, ShieldCheck } from "lucide-react";
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
 import { HeroSearchBar } from "@/components/HeroSearchBar";
-import { AnimatedCounter } from "@/components/AnimatedCounter";
-import { FadeInOnScroll } from "@/components/FadeInOnScroll";
-import { BrandLogo } from "@/components/BrandLogo";
+import { CarCard, type CarCardData } from "@/components/CarCard";
+import { CarImage } from "@/components/CarImage";
+import { formatLakh, timeAgo, withServedImages } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+// Rebuilt at most once a minute instead of on every request.
+export const revalidate = 60;
 
-/* ═══════════════════════════════════════════════════════ */
-/*  BRAND DATA — Using reliable SVG logo sources          */
-/* ═══════════════════════════════════════════════════════ */
 const BRANDS = [
   { name: "Toyota", logo: "/brands/toyota.svg" },
   { name: "Honda", logo: "/brands/honda.svg" },
-  { name: "BMW", logo: "/brands/bmw.svg" },
-  { name: "Mercedes-Benz", logo: "/brands/mercedes.svg" },
   { name: "Nissan", logo: "/brands/nissan.svg" },
+  { name: "Mitsubishi", logo: "/brands/mitsubishi.svg" },
   { name: "Hyundai", logo: "/brands/hyundai.svg" },
-  { name: "Audi", logo: "/brands/audi.svg" },
-  { name: "Lexus", logo: "/brands/lexus.svg" },
   { name: "Kia", logo: "/brands/kia.svg" },
   { name: "Mazda", logo: "/brands/mazda.svg" },
+  { name: "BMW", logo: "/brands/bmw.svg" },
+  { name: "Mercedes-Benz", logo: "/brands/mercedes.svg" },
+  { name: "Audi", logo: "/brands/audi.svg" },
+  { name: "Lexus", logo: "/brands/lexus.svg" },
   { name: "Volkswagen", logo: "/brands/volkswagen.svg" },
-  { name: "Mitsubishi", logo: "/brands/mitsubishi.svg" },
 ];
 
-const FALLBACK_CAR_IMAGE = "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=800";
+// Budgets as buyers here say them: in lakh and crore.
+const BUDGETS = [
+  { key: 0, label: "Under 10 lakh", href: "/cars?maxPrice=1000000" },
+  { key: 1_000_000, label: "10 – 20 lakh", href: "/cars?minPrice=1000000&maxPrice=2000000" },
+  { key: 2_000_000, label: "20 – 40 lakh", href: "/cars?minPrice=2000000&maxPrice=4000000" },
+  { key: 4_000_000, label: "40 lakh – 1 crore", href: "/cars?minPrice=4000000&maxPrice=10000000" },
+  { key: "top", label: "Above 1 crore", href: "/cars?minPrice=10000000" },
+];
 
-const HOW_IT_WORKS = [
-  {
-    step: "01",
-    icon: SearchIcon,
-    title: "Search & Discover",
-    description: "Browse thousands of verified listings with our powerful real-time search and advanced filters.",
-    color: "from-violet-500 to-purple-600",
-  },
-  {
-    step: "02",
-    icon: MessageSquare,
-    title: "Connect with Seller",
-    description: "Chat directly with verified sellers, ask questions, and negotiate the best deal.",
-    color: "from-blue-500 to-cyan-500",
-  },
-  {
-    step: "03",
-    icon: Shield,
-    title: "Inspect & Verify",
-    description: "Meet the seller, inspect the vehicle, verify documents, and get a professional checkup.",
-    color: "from-emerald-500 to-teal-500",
-  },
-  {
-    step: "04",
-    icon: CreditCard,
-    title: "Secure Payment",
-    description: "Complete the transaction safely with Stripe, SSLCommerz, or PayPal integration.",
-    color: "from-amber-500 to-orange-500",
-  },
+const PAPERS = [
+  { name: "Registration certificate", detail: "Smart card matches the chassis and engine number" },
+  { name: "Tax token", detail: "Paid up and in date" },
+  { name: "Fitness certificate", detail: "Valid on the day we check" },
+  { name: "Route permit or ownership slip", detail: "Seller is the owner, or has the right to sell" },
+];
+
+const STEPS = [
+  { title: "Shortlist", body: "Filter by budget, make, fuel and city. Save the cars worth a second look." },
+  { title: "Talk to the seller", body: "Message on CarHat, call, or WhatsApp. Ask for the service history." },
+  { title: "Inspect in person", body: "See the car in daylight, take a test drive and hold the original papers." },
+  { title: "Transfer at BRTA", body: "Complete the name transfer before the full payment changes hands." },
 ];
 
 const TESTIMONIALS = [
   {
     name: "Rahim Ahmed",
-    role: "Car Buyer",
-    content: "Found my dream Toyota Corolla Cross within 3 days. The real-time search and verified seller badges gave me complete confidence. Best car platform in Bangladesh!",
-    rating: 5,
-    accent: "from-violet-500 to-purple-500",
+    role: "Bought a Corolla Cross",
+    content: "Found my Corolla Cross within three days. The Paper Verified badge meant I wasn't chasing the seller for documents.",
   },
   {
     name: "Fatima Khan",
-    role: "Private Seller",
-    content: "Sold my Honda Civic in just 48 hours! The listing process was incredibly simple and I received multiple serious inquiries. CarHat.bd is a game-changer.",
-    rating: 5,
-    accent: "from-blue-500 to-cyan-500",
+    role: "Sold a Honda Civic",
+    content: "Listed on a Friday, sold by Sunday. I had several serious calls and no time-wasters.",
   },
   {
     name: "Kamal Hossain",
-    role: "Dealer Partner",
-    content: "As a certified dealer, the analytics dashboard and bulk upload feature have transformed my business. My sales increased by 40% in the first month. Highly recommended!",
-    rating: 5,
-    accent: "from-emerald-500 to-teal-500",
+    role: "Dealer, Tejgaon",
+    content: "Our reconditioned stock gets far more enquiries here than anywhere else we list.",
   },
 ];
 
-const WHY_CHOOSE_US = [
-  { title: "Verified Sellers", desc: "Every seller is identity-verified for your safety.", icon: Shield, color: "from-violet-500 to-purple-600" },
-  { title: "Real Photos", desc: "High-quality photos uploaded by actual owners.", icon: Camera, color: "from-blue-500 to-cyan-500" },
-  { title: "Instant Chat", desc: "Connect with sellers in real-time via our messaging system.", icon: Zap, color: "from-amber-500 to-orange-500" },
-  { title: "Price Transparency", desc: "Market-fair pricing with EMI calculator built-in.", icon: TrendingUp, color: "from-emerald-500 to-teal-500" },
-  { title: "Advanced Filters", desc: "Filter by brand, price, fuel, transmission, condition.", icon: Filter, color: "from-pink-500 to-rose-500" },
-  { title: "Secure Payments", desc: "Stripe, SSLCommerz, and PayPal for safe transactions.", icon: Lock, color: "from-indigo-500 to-violet-500" },
-];
+const CARD_FIELDS = {
+  title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1,
+  transmission: 1, condition: 1, location: 1, featured: 1, paperVerified: 1, createdAt: 1,
+  images: { $slice: 1 },
+};
 
-export default async function Home() {
-  let trendingCars: any[] = [];
-  let latestCars: any[] = [];
-  let totalListings = 0;
+function serialize<T extends { _id: unknown; images?: string[] }>(docs: T[]): T[] {
+  return JSON.parse(JSON.stringify(docs.map(withServedImages)));
+}
 
+async function getHomeData() {
   try {
     await connectToDatabase();
-    trendingCars = await Listing.find({ status: "active" })
-      .select("-documents")
-      .sort({ views: -1 })
-      .limit(8)
-      .lean() as any[];
+    const [latest, popular, verified, activeCount, verifiedCount, makes, budgets, cities] = await Promise.all([
+      Listing.find({ status: "active" }).select(CARD_FIELDS).sort({ createdAt: -1 }).limit(5).lean(),
+      Listing.find({ status: "active" }).select(CARD_FIELDS).sort({ featured: -1, views: -1 }).limit(8).lean(),
+      Listing.find({ status: "active", paperVerified: true }).select(CARD_FIELDS).sort({ createdAt: -1 }).limit(1).lean(),
+      Listing.countDocuments({ status: "active" }),
+      Listing.countDocuments({ status: "active", paperVerified: true }),
+      Listing.aggregate([{ $match: { status: "active" } }, { $group: { _id: "$make", count: { $sum: 1 } } }]),
+      Listing.aggregate([
+        { $match: { status: "active" } },
+        {
+          $bucket: {
+            groupBy: "$price",
+            boundaries: [0, 1_000_000, 2_000_000, 4_000_000, 10_000_000],
+            default: "top",
+            output: { count: { $sum: 1 } },
+          },
+        },
+      ]),
+      Listing.distinct("location", { status: "active" }),
+    ]);
 
-    latestCars = await Listing.find({ status: "active" })
-      .select("-documents")
-      .sort({ createdAt: -1 })
-      .limit(4)
-      .lean() as any[];
-
-    totalListings = await Listing.countDocuments({ status: "active" });
+    return {
+      latest: serialize(latest) as unknown as (CarCardData & { createdAt: string })[],
+      popular: serialize(popular) as unknown as CarCardData[],
+      verifiedCar: (serialize(verified) as unknown as CarCardData[])[0],
+      activeCount,
+      verifiedCount,
+      makeCounts: Object.fromEntries(makes.map((m) => [String(m._id).toLowerCase(), m.count])) as Record<string, number>,
+      budgetCounts: Object.fromEntries(budgets.map((b) => [String(b._id), b.count])) as Record<string, number>,
+      cityCount: cities.length,
+    };
   } catch (error) {
-    console.error("Failed to fetch data from MongoDB:", error);
+    console.error("Home page data failed to load:", error);
+    return {
+      latest: [],
+      popular: [],
+      verifiedCar: undefined,
+      activeCount: 0,
+      verifiedCount: 0,
+      makeCounts: {} as Record<string, number>,
+      budgetCounts: {} as Record<string, number>,
+      cityCount: 0,
+    };
   }
+}
+
+export default async function Home() {
+  const data = await getHomeData();
 
   return (
     <div className="flex flex-col">
-      {/* ════════════════ HERO ════════════════ */}
-      <section className="relative min-h-[700px] flex items-center justify-center overflow-hidden">
-        {/* Background image */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80 z-10" />
-        <div
-          className="absolute inset-0 bg-cover bg-center scale-105"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80&w=2000')",
-          }}
-        />
-        {/* Animated gradient overlays */}
-        <div className="absolute inset-0 z-10 opacity-40" style={{
-          backgroundImage: "radial-gradient(ellipse at 20% 50%, rgba(139,92,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(236,72,153,0.1) 0%, transparent 50%)",
-        }} />
-        {/* Floating decorative elements */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-[100px] animate-float-slow z-10" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-float z-10" />
-
-        <div className="relative z-20 text-center px-4 w-full max-w-5xl mx-auto">
-          {/* Animated badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-5 py-2 mb-6 badge-shimmer">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-white/90 font-medium text-sm tracking-wide">
-              Bangladesh&apos;s #1 Car Marketplace
-            </span>
-          </div>
-
-          <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-white mb-6 tracking-tight leading-[1.05]">
-            Find Your{" "}
-            <span className="relative inline-block">
-              <span className="gradient-text-animated">Dream Car</span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 8.5C50 2.5 100 2.5 150 6C200 9.5 250 4 298 7" stroke="url(#hero-underline)" strokeWidth="3" strokeLinecap="round"/>
-                <defs>
-                  <linearGradient id="hero-underline" x1="0" y1="0" x2="300" y2="0" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#c084fc"/>
-                    <stop offset="1" stopColor="#f472b6"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </span>
-            <br className="hidden sm:block" />
-            Today
-          </h1>
-
-          <p className="text-lg md:text-xl text-slate-200 mb-10 max-w-2xl mx-auto leading-relaxed drop-shadow-sm">
-            Search from <span className="text-white font-bold">{totalListings.toLocaleString()}+</span> verified listings. Buy, sell, and explore premium vehicles with confidence.
-          </p>
-
-          {/* Real-time Search */}
-          <HeroSearchBar />
-
-          {/* Quick Stats Badges */}
-          <div className="flex flex-wrap justify-center gap-4 mt-10">
-            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
-              <CheckCircle2 size={14} className="text-green-400" />
-              <span className="text-white/80 text-sm font-medium">Verified Sellers</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
-              <Shield size={14} className="text-blue-400" />
-              <span className="text-white/80 text-sm font-medium">Secure Platform</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
-              <Star size={14} className="text-amber-400" />
-              <span className="text-white/80 text-sm font-medium">4.9 Rating</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent z-20" />
-      </section>
-
-      {/* ════════════════ POPULAR BRANDS ════════════════ */}
-      <section className="py-20 bg-background relative overflow-hidden">
-        {/* Subtle background decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/3 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-500/3 rounded-full blur-[80px]" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <FadeInOnScroll>
-            <div className="text-center mb-14">
-              <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">Popular Brands</span>
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">Browse by Brand</h2>
-              <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Explore vehicles from the world&apos;s most trusted manufacturers
+      {/* ─── Hero: search on the left, the live board of new listings on the right ─── */}
+      <section className="on-ink bg-brand-ink relative overflow-hidden text-white">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pb-14 pt-10 sm:px-6 md:pt-16 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:pb-20">
+          <div className="lg:col-span-7 lg:pt-6">
+            {data.activeCount > 0 && (
+              <p className="inline-flex items-center gap-2 text-[15px] font-medium text-[#b9d3f0]">
+                <span className="h-2 w-2 rounded-full bg-teal" aria-hidden />
+                <span className="tabular">{data.activeCount.toLocaleString("en-IN")}</span> cars for sale in{" "}
+                <span className="tabular">{data.cityCount}</span> {data.cityCount === 1 ? "city" : "cities"}
               </p>
+            )}
+            <h1 className="display mt-4 text-[2.6rem] sm:text-6xl lg:text-[4.25rem]">
+              Bangladesh&apos;s car haat, open all day.
+            </h1>
+            <p className="mt-5 max-w-xl text-lg leading-relaxed text-[#cfe0f5]">
+              New, used and reconditioned cars from dealers and owners, with the papers checked
+              before the badge goes on.
+            </p>
+            <div className="mt-8 max-w-2xl">
+              <HeroSearchBar />
             </div>
-          </FadeInOnScroll>
-
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 md:gap-5">
-            {BRANDS.map((brand, i) => (
-              <FadeInOnScroll key={brand.name} delay={i * 50}>
-                <Link href={`/cars?make=${brand.name}`}>
-                  <div className="group relative bg-card border border-border rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all duration-500 h-full card-hover card-glow">
-                    {/* Gradient background on hover */}
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    
-                    <div className="relative w-14 h-14 flex items-center justify-center mb-3 grayscale group-hover:grayscale-0 transition-all duration-500 group-hover:scale-110">
-                      <BrandLogo src={brand.logo} alt={brand.name} fallbackInitial={brand.name[0]} brandName={brand.name} />
-                    </div>
-                    <span className="relative text-sm font-semibold text-center group-hover:text-primary transition-colors duration-300">{brand.name}</span>
-                  </div>
-                </Link>
-              </FadeInOnScroll>
-            ))}
           </div>
-        </div>
-      </section>
 
-      {/* Section Divider */}
-      <div className="section-divider" />
-
-      {/* ════════════════ TRENDING CARS ════════════════ */}
-      <section className="py-20 bg-muted/30 relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 w-[600px] h-[600px] -translate-x-1/2 bg-primary/3 rounded-full blur-[120px]" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <FadeInOnScroll>
-            <div className="flex justify-between items-end mb-12">
-              <div>
-                <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">Most Popular</span>
-                <h2 className="text-3xl md:text-5xl font-bold mb-2 flex items-center gap-3">
-                  Trending Cars
-                  <span className="inline-flex items-center gap-1 bg-orange-500/10 text-orange-600 text-sm font-semibold px-3 py-1 rounded-full">
-                    <TrendingUp size={14} /> Hot
-                  </span>
-                </h2>
-                <p className="text-muted-foreground text-lg">Most viewed vehicles this week</p>
+          <div className="lg:col-span-5">
+            <div className="rounded-2xl border border-white/12 bg-white/[0.06] p-2 backdrop-blur-sm">
+              <div className="flex items-baseline justify-between px-3 pb-2 pt-2.5">
+                <h2 className="font-semiwide text-base font-bold">Just listed</h2>
+                <Link href="/cars?sort=newest" className="text-sm font-medium text-teal-soft hover:text-white">
+                  See all
+                </Link>
               </div>
-              <Link href="/cars" className="hidden sm:flex items-center gap-2 text-primary font-semibold hover:gap-3 transition-all group bg-primary/5 hover:bg-primary/10 px-5 py-2.5 rounded-xl">
-                View all <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </FadeInOnScroll>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {trendingCars.map((car: any, i: number) => (
-              <FadeInOnScroll key={car._id.toString()} delay={i * 80}>
-                <div className="bg-card rounded-2xl border border-border overflow-hidden group flex flex-col h-full card-hover card-glow relative">
-                  <Link href={`/cars/${car.slug}`}>
-                    <div className="relative h-52 overflow-hidden bg-muted">
-                      {/* Gradient overlay on image */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                      
-                      {/* Badges */}
-                      <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start">
-                        {car.featured && (
-                          <span className="bg-gradient-to-r from-primary to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-primary/20 badge-shimmer">
-                            FEATURED
-                          </span>
-                        )}
-                        {car.paperVerified && (
-                          <span className="bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-emerald-600/30 flex items-center gap-1 backdrop-blur-sm">
-                            <ShieldCheck size={12} /> Paper Verified
-                          </span>
-                        )}
-                      </div>
-                      <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg capitalize z-20 border border-white/10">
-                        {car.condition}
-                      </div>
-
-                      {/* Heart button */}
-                      <div className="absolute bottom-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-                        <div className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-white hover:scale-110 transition-all shadow-lg">
-                          <Heart size={16} className="text-gray-600 hover:text-red-500 transition-colors" />
-                        </div>
-                      </div>
-
-                      {/* Image */}
-                      <div
-                        className="w-full h-full bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out"
-                        style={{ backgroundImage: `url(${car.images?.[0] || FALLBACK_CAR_IMAGE})` }}
-                      />
-                    </div>
-                  </Link>
-                  <div className="p-5 flex-grow flex flex-col">
-                    <Link href={`/cars/${car.slug}`}>
-                      <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors duration-300 mb-1.5 line-clamp-1">
-                        {car.title}
-                      </h3>
-                    </Link>
-                    <p className="text-muted-foreground text-xs flex items-center gap-1.5 mb-3">
-                      <MapPin size={12} className="text-primary/60" /> {car.location}
-                    </p>
-                    <p className="text-2xl font-extrabold text-primary mb-3 price-tag">
-                      ৳ {car.price?.toLocaleString()}
-                    </p>
-                    <div className="flex gap-3 text-xs text-muted-foreground mb-4">
-                      <span className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-lg">
-                        <Gauge size={12} className="text-primary/60" /> {car.mileage?.toLocaleString()} km
-                      </span>
-                      <span className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-lg">
-                        <Fuel size={12} className="text-primary/60" /> {car.fuelType}
-                      </span>
-                    </div>
-                    <div className="mt-auto pt-3 border-t border-border">
+              {data.latest.length === 0 ? (
+                <p className="px-3 pb-4 text-[15px] text-[#b9d3f0]">New listings will appear here as sellers post them.</p>
+              ) : (
+                <ol className="space-y-1">
+                  {data.latest.map((car, i) => (
+                    <li key={car._id} className={i >= 3 ? "board-row hidden sm:block" : "board-row"} style={{ animationDelay: `${120 + i * 90}ms` }}>
                       <Link
                         href={`/cars/${car.slug}`}
-                        className="group/btn block text-center w-full bg-gradient-to-r from-primary/5 to-purple-500/5 text-primary hover:from-primary hover:to-purple-600 hover:text-white py-2.5 rounded-xl text-sm font-semibold transition-all duration-300"
+                        className="flex items-center gap-3 rounded-xl bg-white p-2 pr-3.5 text-foreground transition-transform hover:-translate-y-px"
                       >
-                        View Details <ArrowRight size={14} className="inline ml-1 group-hover/btn:translate-x-1 transition-transform" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </FadeInOnScroll>
-            ))}
-          </div>
-
-          {/* Mobile View All */}
-          <div className="sm:hidden mt-8 text-center">
-            <Link href="/cars" className="inline-flex items-center gap-2 text-primary font-semibold bg-primary/5 hover:bg-primary/10 px-6 py-3 rounded-xl transition-colors">
-              View All Cars <ChevronRight size={16} />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════ ANIMATED STATS ════════════════ */}
-      <section className="py-20 relative overflow-hidden bg-slate-950 border-y border-white/10">
-        {/* Dark gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/70 to-slate-950" />
-        {/* Decorative glow orbs */}
-        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[90px]" />
-        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-48 h-48 bg-pink-500/15 rounded-full blur-[70px]" />
-        
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <FadeInOnScroll>
-            <div className="text-center mb-12">
-              <span className="inline-block text-purple-300 text-xs font-bold tracking-widest uppercase mb-2 px-3 py-1 rounded-full bg-white/10 border border-white/15">
-                Marketplace Metrics
-              </span>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-3 tracking-tight">Trusted by Thousands</h2>
-              <p className="text-purple-200 text-base md:text-lg font-medium">Real-time stats from Bangladesh&apos;s fastest growing car network</p>
-            </div>
-          </FadeInOnScroll>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { end: totalListings || 14, suffix: "+", label: "Active Listings", icon: Car },
-              { end: 50000, suffix: "+", label: "Happy Users", icon: Users },
-              { end: 500, suffix: "+", label: "Verified Dealers", icon: Award },
-              { end: 98, suffix: "%", label: "Satisfaction Rate", icon: Star },
-            ].map((stat, i) => (
-              <FadeInOnScroll key={stat.label} delay={i * 100}>
-                <div className="relative group">
-                  <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-6 text-center hover:bg-white/15 hover:border-white/25 transition-all duration-300 shadow-xl stat-glow">
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md shadow-primary/30">
-                      <stat.icon size={22} className="text-white" />
-                    </div>
-                    <AnimatedCounter end={stat.end} suffix={stat.suffix} label={stat.label} dark />
-                  </div>
-                </div>
-              </FadeInOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════ HOW IT WORKS ════════════════ */}
-      <section className="py-24 bg-background relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 section-divider" />
-
-        <div className="max-w-6xl mx-auto px-4">
-          <FadeInOnScroll>
-            <div className="text-center mb-16">
-              <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">Simple Process</span>
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">How It Works</h2>
-              <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Buy or sell a car in 4 simple steps
-              </p>
-            </div>
-          </FadeInOnScroll>
-
-          <div className="grid md:grid-cols-4 gap-8 relative">
-            {/* Connector line */}
-            <div className="hidden md:block absolute top-14 left-[12.5%] right-[12.5%] h-[2px]">
-              <div className="w-full h-full bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" style={{ backgroundImage: "repeating-linear-gradient(90deg, hsl(var(--primary) / 0.3) 0px, hsl(var(--primary) / 0.3) 8px, transparent 8px, transparent 16px)" }} />
-            </div>
-
-            {HOW_IT_WORKS.map((item, i) => (
-              <FadeInOnScroll key={item.step} delay={i * 120}>
-                <div className="relative text-center group">
-                  <div className={`w-[72px] h-[72px] rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:shadow-xl transition-all duration-500 relative z-10 shadow-lg`}>
-                    <item.icon size={28} className="text-white" />
-                    <span className="absolute -top-2 -right-2 bg-card text-foreground text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center shadow-md border border-border">
-                      {item.step}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors duration-300">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed max-w-[240px] mx-auto">{item.description}</p>
-                </div>
-              </FadeInOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════ LATEST ARRIVALS ════════════════ */}
-      {latestCars.length > 0 && (
-        <section className="py-20 bg-muted/30 relative overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <FadeInOnScroll>
-              <div className="flex justify-between items-end mb-12">
-                <div>
-                  <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">New Listings</span>
-                  <h2 className="text-3xl md:text-5xl font-bold mb-2 flex items-center gap-3">
-                    Just Arrived
-                    <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-600 text-sm font-semibold px-3 py-1 rounded-full">
-                      <Clock size={14} /> Fresh
-                    </span>
-                  </h2>
-                  <p className="text-muted-foreground text-lg">Fresh listings added recently</p>
-                </div>
-                <Link href="/cars" className="hidden sm:flex items-center gap-2 text-primary font-semibold hover:gap-3 transition-all group bg-primary/5 hover:bg-primary/10 px-5 py-2.5 rounded-xl">
-                  View all <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              </div>
-            </FadeInOnScroll>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {latestCars.map((car: any, i: number) => (
-                <FadeInOnScroll key={car._id.toString()} delay={i * 100}>
-                  <Link href={`/cars/${car.slug}`} className="block group">
-                    <div className="bg-card rounded-2xl border border-border overflow-hidden group flex h-52 card-hover card-glow">
-                      <div className="w-[38%] overflow-hidden bg-muted relative">
-                        <div
-                          className="w-full h-full bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out"
-                          style={{ backgroundImage: `url(${car.images?.[0] || FALLBACK_CAR_IMAGE})` }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
-                        <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
-                          <span className="bg-green-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-lg shadow-lg">
-                            NEW
-                          </span>
-                          {car.paperVerified && (
-                            <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg shadow-emerald-600/30 flex items-center gap-1 backdrop-blur-sm">
-                              <ShieldCheck size={11} /> Verified
-                            </span>
-                          )}
+                        <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+                          <CarImage src={car.images?.[0]} alt="" sizes="80px" priority={i < 2} />
                         </div>
-                      </div>
-                      <div className="flex-grow p-6 flex flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300 line-clamp-1">
-                            {car.title}
-                          </h3>
-                          <p className="text-muted-foreground text-xs flex items-center gap-1.5 mt-1.5">
-                            <MapPin size={12} className="text-primary/60" /> {car.location}
+                        <div className="min-w-0 grow">
+                          <p className="truncate text-[15px] font-semibold">{car.title}</p>
+                          <p className="truncate text-sm text-muted-foreground">
+                            {car.location}, {timeAgo(car.createdAt)}
                           </p>
                         </div>
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-2xl font-extrabold text-primary price-tag">৳ {car.price?.toLocaleString()}</p>
-                            <div className="flex gap-2 text-xs text-muted-foreground mt-1.5">
-                              <span className="bg-muted/50 px-2 py-0.5 rounded">{car.mileage?.toLocaleString()} km</span>
-                              <span className="bg-muted/50 px-2 py-0.5 rounded capitalize">{car.fuelType}</span>
-                              <span className="bg-muted/50 px-2 py-0.5 rounded capitalize">{car.transmission}</span>
-                            </div>
-                          </div>
-                          <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                            <ArrowRight size={18} className="text-primary group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </FadeInOnScroll>
-              ))}
+                        <p className="price-tag shrink-0 text-right text-base sm:text-lg">{formatLakh(car.price)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* ════════════════ WHY CHOOSE US ════════════════ */}
-      <section className="py-24 bg-background relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/3 rounded-full blur-[120px]" />
-
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <FadeInOnScroll>
-            <div className="text-center mb-16">
-              <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">Why Us</span>
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">Why Choose CarHat.bd?</h2>
-              <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                The safest and most convenient way to buy or sell a car in Bangladesh
-              </p>
-            </div>
-          </FadeInOnScroll>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {WHY_CHOOSE_US.map((item, i) => (
-              <FadeInOnScroll key={item.title} delay={i * 80}>
-                <div className="bg-card border border-border rounded-2xl p-7 card-hover card-glow group relative overflow-hidden">
-                  {/* Gradient accent on hover */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left`} />
-                  
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-5 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300 shadow-md`}>
-                    <item.icon size={22} className="text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors duration-300">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-                </div>
-              </FadeInOnScroll>
-            ))}
           </div>
         </div>
       </section>
 
-      {/* Section Divider */}
-      <div className="section-divider" />
-
-      {/* ════════════════ TESTIMONIALS ════════════════ */}
-      <section className="py-24 bg-muted/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-primary/3 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/3 rounded-full blur-[80px]" />
-
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <FadeInOnScroll>
-            <div className="text-center mb-16">
-              <span className="inline-block text-primary text-sm font-semibold tracking-widest uppercase mb-3">Testimonials</span>
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">What Our Users Say</h2>
-              <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-                Trusted by thousands of buyers, sellers, and dealers across Bangladesh
-              </p>
-            </div>
-          </FadeInOnScroll>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t, i) => (
-              <FadeInOnScroll key={t.name} delay={i * 120}>
-                <div className="bg-card border border-border rounded-2xl p-8 card-hover relative overflow-hidden group">
-                  {/* Top gradient accent */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${t.accent}`} />
-
-                  {/* Large quote mark */}
-                  <div className="absolute top-6 right-6 w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
-                    <Quote size={20} className="text-primary/30" />
-                  </div>
-
-                  <div className="flex gap-1 mb-5">
-                    {Array.from({ length: t.rating }).map((_, s) => (
-                      <Star key={s} size={16} className="fill-amber-500 text-amber-500" />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-7">
-                    &ldquo;{t.content}&rdquo;
-                  </p>
-                  <div className="flex items-center gap-3 border-t border-border pt-5">
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${t.accent} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
-                      {t.name[0]}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
-                    </div>
-                  </div>
-                </div>
-              </FadeInOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════ CTA SECTION ════════════════ */}
-      <section className="py-28 relative overflow-hidden bg-slate-950 border-t border-white/10">
-        {/* Dark gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/80 to-slate-950" />
-        
-        {/* Decorative elements */}
-        <div className="absolute top-10 left-10 w-32 h-32 border border-white/10 rounded-2xl rotate-12 animate-float-slow" />
-        <div className="absolute bottom-10 right-10 w-24 h-24 border border-white/10 rounded-full animate-float" />
-        <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-primary/20 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 right-1/4 w-60 h-60 bg-pink-500/15 rounded-full blur-[80px]" />
-
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <FadeInOnScroll>
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 mb-8 shadow-md">
-              <Zap size={15} className="text-amber-300" />
-              <span className="text-white text-sm font-semibold tracking-wide">Join 50,000+ happy car buyers & sellers</span>
-            </div>
-
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-6 leading-tight tracking-tight">
-              Ready to Find Your{" "}
-              <span className="gradient-text-animated block sm:inline mt-1 sm:mt-0">Perfect Car</span>?
+      {/* ─── Budget ─── */}
+      <section aria-labelledby="budget-heading" className="border-b border-border bg-card">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
+            <h2 id="budget-heading" className="shrink-0 text-base font-semibold">
+              Shop by budget
             </h2>
-            <p className="text-lg md:text-xl text-slate-200 mb-12 max-w-2xl mx-auto leading-relaxed font-normal drop-shadow-sm">
-              Whether you&apos;re buying your first vehicle or selling to verified buyers, CarHat.bd makes it simple, transparent, and fast.
+            <ul className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:grid lg:grow lg:grid-cols-5 lg:px-0">
+              {BUDGETS.map((b) => {
+                const count = data.budgetCounts[String(b.key)] || 0;
+                return (
+                  <li key={b.label} className="shrink-0">
+                    <Link
+                      href={b.href}
+                      className="flex h-full flex-col rounded-lg border border-border px-4 py-2.5 transition-colors hover:border-primary hover:bg-accent"
+                    >
+                      <span className="font-semiwide whitespace-nowrap text-[15px] font-bold">{b.label}</span>
+                      <span className="text-sm text-muted-foreground tabular">
+                        {count > 0 ? `${count} ${count === 1 ? "car" : "cars"}` : "Browse"}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Most viewed ─── */}
+      <section className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <h2 className="font-semiwide text-3xl font-extrabold md:text-4xl">What buyers are looking at</h2>
+            <p className="mt-2 text-muted-foreground">Featured and most-viewed cars right now.</p>
+          </div>
+          <Link
+            href="/cars"
+            className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:border-primary sm:inline-flex"
+          >
+            Browse all cars <ArrowRight size={16} aria-hidden />
+          </Link>
+        </div>
+
+        {data.popular.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-input bg-card p-10 text-center">
+            <p className="font-semibold">No cars are listed right now.</p>
+            <p className="mt-1 text-muted-foreground">Be the first: it takes about five minutes.</p>
+            <Link href="/sell" className="mt-4 inline-flex rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">
+              Sell your car
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {data.popular.map((car) => (
+              <CarCard key={car._id} car={car} sizes="(min-width: 1024px) 18rem, (min-width: 640px) 45vw, 92vw" />
+            ))}
+          </div>
+        )}
+
+        <Link
+          href="/cars"
+          className="mt-6 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card py-3 font-semibold text-primary sm:hidden"
+        >
+          Browse all cars <ArrowRight size={16} aria-hidden />
+        </Link>
+      </section>
+
+      {/* ─── Makes ─── */}
+      <section aria-labelledby="makes-heading" className="defer-render border-y border-border bg-card">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <h2 id="makes-heading" className="font-semiwide text-2xl font-extrabold md:text-3xl">
+            Browse by make
+          </h2>
+          <ul className="mt-7 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-6">
+            {BRANDS.map((brand) => {
+              const count = data.makeCounts[brand.name.toLowerCase()] || 0;
+              return (
+                <li key={brand.name} className="bg-card">
+                  <Link
+                    href={`/cars?make=${encodeURIComponent(brand.name)}`}
+                    className="group flex flex-col items-center gap-2 px-2 py-5 transition-colors hover:bg-accent"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- tiny static SVGs */}
+                    <img src={brand.logo} alt="" width={44} height={44} loading="lazy" decoding="async" className="h-11 w-11 object-contain" />
+                    <span className="text-center text-sm font-semibold group-hover:text-primary">{brand.name}</span>
+                    <span className="-mt-1.5 text-xs text-muted-foreground tabular">
+                      {count > 0 ? `${count} for sale` : " "}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* ─── Paper Verified ─── */}
+      <section aria-labelledby="papers-heading" className="defer-render mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-md bg-verified px-2.5 py-1 text-sm font-semibold text-white">
+              <ShieldCheck size={16} aria-hidden /> Paper Verified
             </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-              <Link
-                href="/cars"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-primary via-primary to-purple-600 text-white px-9 py-4 rounded-xl font-bold hover:shadow-2xl hover:shadow-primary/40 transition-all duration-300 hover:-translate-y-0.5 text-base md:text-lg"
-              >
-                <SearchIcon size={20} />
-                Browse Cars
-              </Link>
-              <Link
-                href="/sell"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-white text-slate-900 hover:bg-slate-100 px-9 py-4 rounded-xl font-bold transition-all duration-300 hover:-translate-y-0.5 text-base md:text-lg shadow-xl"
-              >
-                Sell Your Car
-                <ArrowRight size={20} className="text-primary" />
-              </Link>
-            </div>
-          </FadeInOnScroll>
+            <h2 id="papers-heading" className="font-semiwide mt-5 text-3xl font-extrabold leading-tight md:text-[2.6rem]">
+              We check the papers before you drive across Dhaka to see the car.
+            </h2>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              Sellers upload their documents privately. Our team reads each one, and only then does the listing get
+              the badge. Buyers never see the scans, just the result.
+            </p>
+            <ul className="mt-8 divide-y divide-border rounded-xl border border-border bg-card">
+              {PAPERS.map((p) => (
+                <li key={p.name} className="flex items-start gap-3.5 px-5 py-4">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#e3f5ec] text-verified">
+                    <Check size={15} strokeWidth={3} aria-hidden />
+                  </span>
+                  <div>
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-[15px] text-muted-foreground">{p.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/cars?verified=1"
+              className="mt-7 inline-flex items-center gap-2 rounded-lg bg-verified px-5 py-3 font-semibold text-white transition-colors hover:bg-[#0c6942]"
+            >
+              {data.verifiedCount > 0
+                ? `See ${data.verifiedCount.toLocaleString("en-IN")} cars with checked papers`
+                : "See cars with checked papers"}
+              <ArrowRight size={17} aria-hidden />
+            </Link>
+          </div>
+
+          <div className="relative mx-auto w-full max-w-md">
+            <div className="absolute -inset-3 -z-10 rounded-[2rem] bg-[#e3f5ec] sm:-inset-6" aria-hidden />
+            {data.verifiedCar ? (
+              <CarCard car={data.verifiedCar} sizes="28rem" />
+            ) : (
+              <div className="rounded-xl border border-border bg-card p-8 shadow-card">
+                <FileText size={28} className="text-verified" aria-hidden />
+                <p className="mt-4 font-semibold">Selling? Upload your papers with the listing.</p>
+                <p className="mt-1 text-muted-foreground">Checked listings show the badge in search and on the car page.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── How buying works ─── */}
+      <section aria-labelledby="steps-heading" className="defer-render border-y border-border bg-card">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <h2 id="steps-heading" className="font-semiwide text-2xl font-extrabold md:text-3xl">
+            Buying a car on CarHat
+          </h2>
+          <ol className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+            {STEPS.map((step, i) => (
+              <li key={step.title} className="relative">
+                <span className="font-wide text-5xl font-extrabold leading-none text-[#c9d6e6] tabular" aria-hidden>
+                  {i + 1}
+                </span>
+                <h3 className="mt-3 text-lg font-bold">{step.title}</h3>
+                <p className="mt-1.5 max-w-xs text-[15px] leading-relaxed text-muted-foreground">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ─── Testimonials ─── */}
+      <section aria-labelledby="quotes-heading" className="defer-render mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <h2 id="quotes-heading" className="sr-only">
+          What buyers and sellers say
+        </h2>
+        <div className="grid gap-10 md:grid-cols-3">
+          {TESTIMONIALS.map((t) => (
+            <figure key={t.name} className="border-t-2 border-foreground pt-5">
+              <blockquote className="text-lg leading-relaxed">&ldquo;{t.content}&rdquo;</blockquote>
+              <figcaption className="mt-4 text-[15px]">
+                <span className="font-semibold">{t.name}</span>
+                <span className="text-muted-foreground">, {t.role}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── Sell ─── */}
+      <section className="on-ink bg-brand-ink text-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8 lg:py-16">
+          <div className="max-w-2xl">
+            <h2 className="display text-4xl md:text-5xl">Selling your car?</h2>
+            <p className="mt-4 text-lg text-[#cfe0f5]">
+              Listing is free and takes about five minutes. Add your papers and we&apos;ll check them for the badge.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+            <Link
+              href="/sell"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3.5 font-semibold text-ink transition-colors hover:bg-[#e6eefa]"
+            >
+              Sell your car <ArrowRight size={17} aria-hidden />
+            </Link>
+            <Link
+              href="/contact"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 px-6 py-3.5 font-semibold text-white transition-colors hover:border-white/60 hover:bg-white/10"
+            >
+              <Phone size={17} aria-hidden /> Talk to our team
+            </Link>
+          </div>
         </div>
       </section>
     </div>

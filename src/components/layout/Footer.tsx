@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  Globe,
   Mail,
   Phone,
   MapPin,
@@ -55,230 +55,137 @@ function LinkedinIcon({ className }: { className?: string }) {
   );
 }
 
-export function Footer() {
-  const { settings } = useSiteSettings();
-  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
+const EXPLORE = [
+  { href: "/cars", label: "Buy a car" },
+  { href: "/cars?condition=reconditioned", label: "Reconditioned cars" },
+  { href: "/cars?verified=1", label: "Cars with checked papers" },
+  { href: "/sell", label: "Sell your car" },
+  { href: "/dealers", label: "Find a dealer" },
+];
 
-  const socialLinks: { name: string; icon: any; href: string; color: string }[] = [
-    {
-      name: "Facebook",
-      icon: FacebookIcon,
-      href: settings.socialLinks?.facebook || "",
-      color: "hover:text-[#1877F2]",
-    },
-    {
-      name: "Twitter / X",
-      icon: TwitterIcon,
-      href: settings.socialLinks?.twitter || "",
-      color: "hover:text-foreground",
-    },
-    {
-      name: "Instagram",
-      icon: InstagramIcon,
-      href: settings.socialLinks?.instagram || "",
-      color: "hover:text-[#E4405F]",
-    },
-    {
-      name: "YouTube",
-      icon: YoutubeIcon,
-      href: settings.socialLinks?.youtube || "",
-      color: "hover:text-[#FF0000]",
-    },
-    {
-      name: "LinkedIn",
-      icon: LinkedinIcon,
-      href: settings.socialLinks?.linkedin || "",
-      color: "hover:text-[#0A66C2]",
-    },
+const HELP = [
+  { href: "/faq", label: "Help and FAQ" },
+  { href: "/reviews", label: "Car reviews" },
+  { href: "/blog", label: "Blog" },
+  { href: "/about", label: "About CarHat" },
+  { href: "/contact", label: "Contact us" },
+];
+
+export function Footer() {
+  const pathname = usePathname() || "/";
+  const { settings } = useSiteSettings();
+
+  if (pathname.startsWith("/admin")) return null;
+
+  const socialLinks: { name: string; icon: React.ComponentType<{ className?: string }>; href: string }[] = [
+    { name: "Facebook", icon: FacebookIcon, href: settings.socialLinks?.facebook || "" },
+    { name: "X (Twitter)", icon: TwitterIcon, href: settings.socialLinks?.twitter || "" },
+    { name: "Instagram", icon: InstagramIcon, href: settings.socialLinks?.instagram || "" },
+    { name: "YouTube", icon: YoutubeIcon, href: settings.socialLinks?.youtube || "" },
+    { name: "LinkedIn", icon: LinkedinIcon, href: settings.socialLinks?.linkedin || "" },
     {
       name: "WhatsApp",
       icon: MessageCircle,
       href: settings.socialLinks?.whatsapp
         ? `https://wa.me/${settings.socialLinks.whatsapp.replace(/[^0-9]/g, "")}`
         : "",
-      color: "hover:text-[#25D366]",
     },
   ].filter((item) => Boolean(item.href && item.href.trim()));
 
   return (
-    <footer className="bg-card text-card-foreground border-t border-border relative z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">
-          {/* Brand Column */}
-          <div className="md:col-span-4 space-y-4">
-            <Link href="/" className="inline-block group">
-              <div className="relative h-10 flex items-center">
-                <Image
-                  src={logoSrc}
-                  alt={settings.siteName || "CarHat.bd"}
-                  width={150}
-                  height={40}
-                  className="h-9 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    const fallback = e.currentTarget.parentElement?.querySelector(".footer-fallback") as HTMLElement;
-                    if (fallback) fallback.style.display = "flex";
-                  }}
-                />
-                <div className="footer-fallback hidden items-center gap-1 font-bold text-xl tracking-tight text-foreground">
-                  <span>Car<span className="gradient-text">Hat</span>.bd</span>
-                </div>
-              </div>
-            </Link>
-            
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-sm">
-              {settings.tagline ||
-                "The premier destination to buy, sell, and explore the best cars in Bangladesh."}
-            </p>
-
-            {/* Social Links */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-2">
-              {socialLinks.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`w-9 h-9 rounded-xl bg-muted/80 hover:bg-muted border border-border flex items-center justify-center text-muted-foreground transition-all duration-200 hover:scale-110 shadow-sm ${item.color}`}
-                  title={item.name}
-                >
-                  <item.icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="md:col-span-2">
-            <h3 className="font-bold mb-4 text-foreground text-sm uppercase tracking-wider">
-              Explore
-            </h3>
-            <ul className="space-y-2.5 text-sm text-muted-foreground">
-              <li>
-                <Link href="/cars" className="hover:text-primary transition-colors">
-                  Buy a Car
-                </Link>
-              </li>
-              <li>
-                <Link href="/sell" className="hover:text-primary transition-colors">
-                  Sell your Car
-                </Link>
-              </li>
-              <li>
-                <Link href="/dealers" className="hover:text-primary transition-colors">
-                  Find Dealers
-                </Link>
-              </li>
-              <li>
-                <Link href="/reviews" className="hover:text-primary transition-colors">
-                  Car Reviews
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="hover:text-primary transition-colors">
-                  Automotive Blog
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div className="md:col-span-2">
-            <h3 className="font-bold mb-4 text-foreground text-sm uppercase tracking-wider">
-              Support
-            </h3>
-            <ul className="space-y-2.5 text-sm text-muted-foreground">
-              <li>
-                <Link href="/faq" className="hover:text-primary transition-colors">
-                  FAQ & Help
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-primary transition-colors">
-                  Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="hover:text-primary transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="hover:text-primary transition-colors">
-                  About Us
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Real-time Contact Information */}
+    <footer className="on-ink bg-ink-deep text-white">
+      <div className="mx-auto max-w-7xl px-4 pb-8 pt-14 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-4">
-            <h3 className="font-bold mb-4 text-foreground text-sm uppercase tracking-wider">
-              Contact Us
-            </h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              {settings.address && (
-                <li className="flex items-start gap-2.5">
-                  <MapPin size={17} className="text-primary flex-shrink-0 mt-0.5" />
-                  <span>{settings.address}</span>
+            <Link href="/" className="inline-flex rounded-lg bg-white px-3 py-2">
+              <Image
+                src={settings.logoUrl || "/car-hat-bd.png"}
+                alt={settings.siteName || "CarHat.bd"}
+                width={140}
+                height={30}
+                sizes="140px"
+                className="h-7 w-auto"
+              />
+            </Link>
+            <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-[#b9d3f0]">
+              {settings.tagline || "The premier destination to buy, sell, and explore the best cars in Bangladesh."}
+            </p>
+            {socialLinks.length > 0 && (
+              <ul className="mt-6 flex flex-wrap gap-2">
+                {socialLinks.map((item) => (
+                  <li key={item.name}>
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={item.name}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-[#b9d3f0] transition-colors hover:border-white/40 hover:text-white"
+                    >
+                      <item.icon className="h-[18px] w-[18px]" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <FooterColumn title="Buy and sell" links={EXPLORE} className="md:col-span-3" />
+          <FooterColumn title="Help" links={HELP} className="md:col-span-2" />
+
+          <div className="md:col-span-3">
+            <h2 className="text-sm font-semibold text-white">Talk to us</h2>
+            <ul className="mt-4 space-y-3 text-[15px] text-[#b9d3f0]">
+              {settings.supportPhone && (
+                <li className="flex items-center gap-2.5">
+                  <Phone size={16} className="shrink-0 text-teal-soft" aria-hidden />
+                  <a href={`tel:${settings.supportPhone}`} className="hover:text-white tabular">{settings.supportPhone}</a>
                 </li>
               )}
               {settings.contactEmail && (
                 <li className="flex items-center gap-2.5">
-                  <Mail size={17} className="text-primary flex-shrink-0" />
-                  <a
-                    href={`mailto:${settings.contactEmail}`}
-                    className="hover:text-primary transition-colors"
-                  >
-                    {settings.contactEmail}
-                  </a>
-                </li>
-              )}
-              {settings.supportPhone && (
-                <li className="flex items-center gap-2.5">
-                  <Phone size={17} className="text-primary flex-shrink-0" />
-                  <a
-                    href={`tel:${settings.supportPhone}`}
-                    className="hover:text-primary transition-colors"
-                  >
-                    {settings.supportPhone}
-                  </a>
+                  <Mail size={16} className="shrink-0 text-teal-soft" aria-hidden />
+                  <a href={`mailto:${settings.contactEmail}`} className="break-all hover:text-white">{settings.contactEmail}</a>
                 </li>
               )}
               {settings.workingHours && (
-                <li className="flex items-center gap-2.5">
-                  <Clock size={17} className="text-primary flex-shrink-0" />
+                <li className="flex items-start gap-2.5">
+                  <Clock size={16} className="mt-1 shrink-0 text-teal-soft" aria-hidden />
                   <span>{settings.workingHours}</span>
+                </li>
+              )}
+              {settings.address && (
+                <li className="flex items-start gap-2.5">
+                  <MapPin size={16} className="mt-1 shrink-0 text-teal-soft" aria-hidden />
+                  <span>{settings.address}</span>
                 </li>
               )}
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-border mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground gap-4">
-          <p>
-            &copy; {new Date().getFullYear()}{" "}
-            {settings.copyrightText || "CarHat.bd. All rights reserved."}
-          </p>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-primary transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-primary transition-colors">
-              Terms of Service
-            </Link>
-            <Link href="/contact" className="hover:text-primary transition-colors">
-              Support
-            </Link>
+        <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-[#9fb3cb] sm:flex-row sm:items-center sm:justify-between">
+          <p>&copy; {new Date().getFullYear()} {settings.copyrightText || "CarHat.bd. All rights reserved."}</p>
+          <div className="flex gap-6">
+            <Link href="/privacy" className="hover:text-white">Privacy</Link>
+            <Link href="/terms" className="hover:text-white">Terms</Link>
           </div>
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterColumn({ title, links, className }: { title: string; links: { href: string; label: string }[]; className?: string }) {
+  return (
+    <div className={className}>
+      <h2 className="text-sm font-semibold text-white">{title}</h2>
+      <ul className="mt-4 space-y-2.5 text-[15px] text-[#b9d3f0]">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="hover:text-white">{l.label}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

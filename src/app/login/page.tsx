@@ -32,6 +32,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [auth0Loading, setAuth0Loading] = useState(false);
   const [registered, setRegistered] = useState(searchParams.get("registered") === "true");
+  // Only follow same-site paths so the login page can't be used as an open redirect.
+  const rawCallback = searchParams.get("callbackUrl") || "";
+  const callbackUrl = rawCallback.startsWith("/") && !rawCallback.startsWith("//") ? rawCallback : "/dashboard";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +59,7 @@ function LoginForm() {
         };
         setError(messages[errorMsg] || "Invalid email or password. Please try again.");
       } else if (res?.ok) {
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
         return;
       } else {
@@ -72,7 +75,7 @@ function LoginForm() {
 
   const handleAuth0Login = () => {
     setAuth0Loading(true);
-    signIn("auth0", { callbackUrl: "/dashboard" });
+    signIn("auth0", { callbackUrl });
   };
 
   const logoSrc = settings.logoUrl || "/car-hat-bd.png";
@@ -97,7 +100,7 @@ function LoginForm() {
         </div>
 
         {registered && (
-          <div className="bg-green-500/10 text-green-600 text-sm p-3 rounded-md mb-6 border border-green-500/20 flex items-center gap-2">
+          <div className="bg-green-500/10 text-verified text-sm p-3 rounded-md mb-6 border border-green-500/20 flex items-center gap-2">
             <CheckCircle2 size={16} />
             Account created successfully! Sign in to continue.
           </div>
@@ -162,7 +165,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading || auth0Loading}
-            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             {loading ? "Signing in..." : "Sign In"}

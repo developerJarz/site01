@@ -39,7 +39,7 @@ export default async function BlogArchivePage() {
             <div className="text-center py-20 bg-card border border-border rounded-2xl">
               <BookOpen
                 size={48}
-                className="mx-auto text-muted-foreground/30 mb-4"
+                className="mx-auto text-muted-foreground mb-4"
               />
               <h3 className="text-xl font-bold mb-2">No blog posts yet</h3>
               <p className="text-muted-foreground">

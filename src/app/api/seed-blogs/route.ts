@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Blog } from "@/lib/models/Blog";
+import { requireAdmin } from "@/lib/admin-auth";
 
 const DEMO_BLOGS = [
   {
@@ -188,6 +189,14 @@ Keep a maintenance log — it adds value when you eventually sell your car on Ca
 ];
 
 export async function GET() {
+  // Seeding wipes existing data, so it only runs when explicitly enabled and an admin asks for it.
+  if (process.env.ALLOW_SEED !== "true") {
+    return NextResponse.json({ error: "Seeding is disabled. Set ALLOW_SEED=true to enable it." }, { status: 404 });
+  }
+  if (process.env.NODE_ENV === "production") {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+  }
   try {
     await connectToDatabase();
     await Blog.deleteMany({});

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { SiteSettings } from "@/lib/models/SiteSettings";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     await connectToDatabase();
 
@@ -24,6 +27,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     await connectToDatabase();
     const body = await req.json();

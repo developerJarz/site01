@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Blog } from "@/lib/models/Blog";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 // GET all blogs (admin sees all, public sees published only)
 export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     const all = req.nextUrl.searchParams.get("all");
     await connectToDatabase();
@@ -19,6 +22,8 @@ export async function GET(req: NextRequest) {
 
 // POST - create new blog (admin only)
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
     await connectToDatabase();
@@ -40,6 +45,8 @@ export async function POST(req: NextRequest) {
 
 // PATCH - update blog
 export async function PATCH(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
     const { id, ...update } = body;
@@ -53,6 +60,8 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
   try {
     const { id } = await req.json();
     await connectToDatabase();
