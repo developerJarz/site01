@@ -1,564 +1,183 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import {
-  Loader2,
-  Save,
-  Globe,
-  Car,
-  Search,
-  AlertTriangle,
-  CheckCircle2,
-  MapPin,
-  Share2,
-  Phone,
-  Mail,
-  Clock,
-  ExternalLink,
-  Sparkles,
-} from "lucide-react";
-import { useSiteSettings, DEFAULT_SETTINGS, SiteSettingsState } from "@/context/SiteSettingsContext";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle, Car, Clock, ExternalLink, Mail, MapPin, Palette, Phone, Search, Share2, Wrench } from "lucide-react";
+import { CountTabs, Field, PageHeader, Panel, SaveBar, SwitchRow, api, inputClass } from "@/components/admin/ui";
+import { useToast } from "@/components/admin/Toast";
+import { useAdmin } from "@/components/admin/AdminContext";
+import { WatermarkEditor } from "@/components/admin/WatermarkEditor";
+import { useSiteSettings, DEFAULT_SETTINGS, type SiteSettingsState } from "@/context/SiteSettingsContext";
+import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/site-config";
+import { cn } from "@/lib/utils";
 
-function ToggleSwitch({ enabled, onChange, label }: { enabled: boolean; onChange: (v: boolean) => void; label?: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      onClick={() => onChange(!enabled)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-primary" : "bg-input"}`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${enabled ? "translate-x-5" : ""}`}
-      />
-    </button>
-  );
-}
+type Form = Pick<SiteSettingsState,
+  "contactEmail" | "supportPhone" | "address" | "workingHours" | "googleMapsUrl" | "socialLinks" |
+  "defaultListingStatus" | "autoApproveListings" | "maxImagesPerListing" | "maintenanceMode" | "maintenanceMessage"
+> & { watermark: WatermarkSettings; siteName: string };
+type Tab = "contact" | "listings" | "watermark" | "maintenance";
+
+const pickForm = (s: Partial<SiteSettingsState> & { watermark?: WatermarkSettings }): Form => ({
+  siteName: s.siteName || DEFAULT_SETTINGS.siteName,
+  contactEmail: s.contactEmail ?? "",
+  supportPhone: s.supportPhone ?? "",
+  address: s.address ?? "",
+  workingHours: s.workingHours ?? "",
+  googleMapsUrl: s.googleMapsUrl ?? "",
+  socialLinks: { ...DEFAULT_SETTINGS.socialLinks, ...(s.socialLinks || {}) },
+  defaultListingStatus: s.defaultListingStatus || "pending",
+  autoApproveListings: !!s.autoApproveListings,
+  maxImagesPerListing: s.maxImagesPerListing || 10,
+  maintenanceMode: !!s.maintenanceMode,
+  maintenanceMessage: s.maintenanceMessage ?? "",
+  watermark: { ...DEFAULT_WATERMARK, ...(s.watermark || {}) },
+});
+
+const SOCIAL: { key: keyof SiteSettingsState["socialLinks"]; label: string; placeholder: string }[] = [
+  { key: "facebook", label: "Facebook page", placeholder: "https://facebook.com/carhatbd" },
+  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/carhatbd" },
+  { key: "youtube", label: "YouTube channel", placeholder: "https://youtube.com/@carhatbd" },
+  { key: "twitter", label: "X (Twitter)", placeholder: "https://x.com/carhatbd" },
+  { key: "linkedin", label: "LinkedIn", placeholder: "https://linkedin.com/company/carhatbd" },
+  { key: "whatsapp", label: "WhatsApp number (with country code)", placeholder: "+8801700000000" },
+];
 
 export default function AdminSettingsPage() {
-  const { settings: globalSettings, updateLiveSettings } = useSiteSettings();
-  const [formData, setFormData] = useState<SiteSettingsState>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const { can } = useAdmin();
+  const { updateLiveSettings } = useSiteSettings();
+  const [tab, setTab] = useState<Tab>("contact");
+  const [saved, setSaved] = useState<Form | null>(null);
+  const [form, setForm] = useState<Form | null>(null);
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.settings) {
-          const merged: SiteSettingsState = {
-            ...DEFAULT_SETTINGS,
-            ...data.settings,
-            socialLinks: {
-              ...DEFAULT_SETTINGS.socialLinks,
-              ...(data.settings.socialLinks || {}),
-            },
-          };
-          setFormData(merged);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load settings:", err);
-      })
-      .finally(() => setLoading(false));
+    api<{ settings: SiteSettingsState & { watermark: WatermarkSettings } }>("/api/admin/settings")
+      .then(({ settings }) => { const f = pickForm(settings); setSaved(f); setForm(f); })
+      .catch((e) => setError((e as Error).message));
   }, []);
 
-  const handleSave = async () => {
+  const dirty = useMemo(() => !!form && !!saved && JSON.stringify(form) !== JSON.stringify(saved), [form, saved]);
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+
+  const save = async () => {
+    if (!form) return;
     setSaving(true);
-    setSaved(false);
-    setStatusMessage("");
     try {
-      const res = await fetch("/api/admin/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (data.success && data.settings) {
-        setSaved(true);
-        setStatusMessage("Settings updated & synced across the entire site in real time!");
-        // Update context & trigger real-time broadcast
-        updateLiveSettings(data.settings);
-        setTimeout(() => setSaved(false), 4000);
-      } else {
-        setStatusMessage("Failed to save: " + (data.error || "Unknown error"));
-      }
-    } catch (error: any) {
-      console.error("Failed to save settings:", error);
-      setStatusMessage("Network error while saving settings");
+      // The site name is shown here for the watermark preview but edited in the website builder.
+      const body: Partial<Form> = { ...form };
+      delete body.siteName;
+      const res = await api<{ settings: SiteSettingsState & { watermark: WatermarkSettings } }>("/api/admin/settings", { method: "PATCH", body: JSON.stringify(body) });
+      const next = pickForm(res.settings);
+      setSaved(next);
+      setForm(next);
+      updateLiveSettings(res.settings);
+      toast.success(form.maintenanceMode && !saved?.maintenanceMode ? "Saved. Maintenance mode is on: visitors see the notice." : "Settings saved and live.");
+    } catch (e) {
+      toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
-  const updateSocial = (key: keyof SiteSettingsState["socialLinks"], val: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      socialLinks: {
-        ...prev.socialLinks,
-        [key]: val,
-      },
-    }));
-  };
-
-  if (loading) {
+  if (!can("settings.manage") && can("appearance.manage")) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={32} className="animate-spin text-primary" />
-      </div>
+      <Panel title="Site settings" subtitle="Your role edits the website, not these settings">
+        <Link href="/admin/appearance" className="inline-flex h-10 items-center gap-2 rounded-xl bg-electric px-4 text-sm font-semibold text-white shadow-glow"><Palette size={16} aria-hidden /> Open the website builder</Link>
+      </Panel>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-5xl pb-16">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-14 lg:top-0 z-20 bg-background/90 backdrop-blur-md py-3 border-b border-border/50">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Marketplace Settings</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Configure site branding, real-time address, social links, and listing policies
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saved && (
-            <span className="text-xs text-verified dark:text-emerald-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
-              <CheckCircle2 size={16} /> Real-time Synced!
-            </span>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-card disabled:opacity-50 active:scale-95"
-          >
-            {saving ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : saved ? (
-              <CheckCircle2 size={18} />
-            ) : (
-              <Save size={18} />
-            )}
-            {saving ? "Saving & Syncing..." : saved ? "Saved!" : "Save Changes"}
-          </button>
-        </div>
-      </div>
-
-      {statusMessage && (
-        <div
-          className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-2 ${
-            saved
-              ? "bg-emerald-500/10 text-verified dark:text-emerald-400 border-emerald-500/20"
-              : "bg-destructive/10 text-destructive border-destructive/20"
-          }`}
-        >
-          {saved ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-          {statusMessage}
-        </div>
+    <div className="space-y-6 pb-24">
+      <PageHeader
+        title="Site settings"
+        description="Contact details, listing rules, photo protection and maintenance mode."
+        actions={
+          <Link href="/admin/appearance" className="inline-flex h-10 items-center gap-2 rounded-xl border border-hairline bg-white px-4 text-sm font-semibold shadow-soft hover:bg-mist">
+            <Palette size={16} aria-hidden /> Logo, colours &amp; layout
+          </Link>
+        }
+      />
+      {form?.maintenanceMode && saved?.maintenanceMode && (
+        <p role="status" className="flex items-center gap-2 rounded-2xl border border-destructive/20 bg-danger-soft px-4 py-3 text-sm font-semibold text-destructive">
+          <AlertTriangle size={17} aria-hidden /> Maintenance mode is on. Visitors see a notice instead of the site; the team can still use everything.
+        </p>
       )}
+      <CountTabs<Tab> label="Settings sections" value={tab} onChange={setTab}
+        tabs={[{ value: "contact", label: "Contact & social" }, { value: "listings", label: "Listing rules" }, { value: "watermark", label: "Photo watermark" }, { value: "maintenance", label: "Maintenance" }]} />
+      {error && <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm font-semibold text-destructive">{error}</p>}
 
-      {/* ──── 1. Address & Contact Information (Real-time Synced) ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <MapPin size={20} className="text-primary" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-lg">Address & Contact Information</h2>
-              <span className="px-2 py-0.5 text-[10px] uppercase font-extrabold bg-primary/15 text-primary rounded-full">
-                Real-Time Live Sync
-              </span>
+      {!form ? (
+        !error && <div className="skeleton h-96 rounded-3xl" />
+      ) : tab === "contact" ? (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Panel title="Contact details" subtitle="Shown in the footer, the contact page and Google's business details">
+            <div className="space-y-4">
+              <Field label="Support email" htmlFor="s-email"><IconInput icon={Mail}><input id="s-email" type="email" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="carhatbd@gmail.com" className={cn(inputClass, "pl-10")} /></IconInput></Field>
+              <Field label="Support phone" htmlFor="s-phone"><IconInput icon={Phone}><input id="s-phone" value={form.supportPhone} onChange={(e) => set("supportPhone", e.target.value)} placeholder="+880 1700-000000" className={cn(inputClass, "pl-10")} /></IconInput></Field>
+              <Field label="Working hours" htmlFor="s-hours"><IconInput icon={Clock}><input id="s-hours" value={form.workingHours} onChange={(e) => set("workingHours", e.target.value)} placeholder="Sat – Thu: 9 AM – 8 PM" className={cn(inputClass, "pl-10")} /></IconInput></Field>
+              <Field label="Office address" htmlFor="s-address"><IconInput icon={MapPin}><input id="s-address" value={form.address} onChange={(e) => set("address", e.target.value)} className={cn(inputClass, "pl-10")} /></IconInput></Field>
+              <Field label="Google Maps link" htmlFor="s-map"><IconInput icon={ExternalLink}><input id="s-map" type="url" value={form.googleMapsUrl} onChange={(e) => set("googleMapsUrl", e.target.value)} placeholder="https://maps.google.com/?q=…" className={cn(inputClass, "pl-10")} /></IconInput></Field>
             </div>
-            <p className="text-xs text-muted-foreground">
-              These details update instantly in Header, Footer, and Contact page
-            </p>
-          </div>
+          </Panel>
+          <Panel title="Social media" subtitle="Icons in the footer; links also tell Google which profiles are yours" action={<Share2 size={18} className="text-slate-text" aria-hidden />}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {SOCIAL.map((s) => (
+                <Field key={s.key} label={s.label} htmlFor={`social-${s.key}`}>
+                  <input id={`social-${s.key}`} value={form.socialLinks[s.key] || ""} placeholder={s.placeholder}
+                    onChange={(e) => set("socialLinks", { ...form.socialLinks, [s.key]: e.target.value })} className={inputClass} />
+                </Field>
+              ))}
+            </div>
+            <p className="mt-4 text-[13px] text-slate-text">Leave a field empty to hide that icon. Links must start with https://.</p>
+          </Panel>
         </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 flex items-center gap-2">
-                <MapPin size={15} className="text-primary" /> Physical Address
-              </label>
-              <input
-                type="text"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="e.g. Plot 12, Road 11, Block C, Gulshan-2, Dhaka"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 flex items-center gap-2">
-                <Clock size={15} className="text-primary" /> Working Hours / Schedule
-              </label>
-              <input
-                type="text"
-                value={formData.workingHours}
-                onChange={(e) => setFormData({ ...formData, workingHours: e.target.value })}
-                placeholder="e.g. Sat - Thu: 9:00 AM - 8:00 PM"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 flex items-center gap-2">
-                <Mail size={15} className="text-primary" /> Contact / Support Email
-              </label>
-              <input
-                type="email"
-                value={formData.contactEmail}
-                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                placeholder="support@carhat.bd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 flex items-center gap-2">
-                <Phone size={15} className="text-primary" /> Support Hotline Number
-              </label>
-              <input
-                type="text"
-                value={formData.supportPhone}
-                onChange={(e) => setFormData({ ...formData, supportPhone: e.target.value })}
-                placeholder="+880 1700-000000"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1.5 flex items-center gap-2">
-              <ExternalLink size={15} className="text-primary" /> Google Maps Link
-            </label>
-            <input
-              type="url"
-              value={formData.googleMapsUrl}
-              onChange={(e) => setFormData({ ...formData, googleMapsUrl: e.target.value })}
-              placeholder="https://maps.google.com/?q=Gulshan-2,Dhaka"
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ──── 2. Social Media Links (Real-time Synced) ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
-            <Share2 size={20} className="text-teal-ink" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-lg">Social Media Links</h2>
-              <span className="px-2 py-0.5 text-[10px] uppercase font-extrabold bg-accent text-teal-ink rounded-full">
-                Real-Time Live Sync
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Direct links connected to the footer and social icons across the site
-            </p>
-          </div>
-        </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Facebook Page / Profile URL</label>
-              <input
-                type="url"
-                value={formData.socialLinks?.facebook || ""}
-                onChange={(e) => updateSocial("facebook", e.target.value)}
-                placeholder="https://facebook.com/carhatbd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Twitter / X URL</label>
-              <input
-                type="url"
-                value={formData.socialLinks?.twitter || ""}
-                onChange={(e) => updateSocial("twitter", e.target.value)}
-                placeholder="https://twitter.com/carhatbd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Instagram URL</label>
-              <input
-                type="url"
-                value={formData.socialLinks?.instagram || ""}
-                onChange={(e) => updateSocial("instagram", e.target.value)}
-                placeholder="https://instagram.com/carhatbd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">YouTube Channel URL</label>
-              <input
-                type="url"
-                value={formData.socialLinks?.youtube || ""}
-                onChange={(e) => updateSocial("youtube", e.target.value)}
-                placeholder="https://youtube.com/@carhatbd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">LinkedIn Profile / Company URL</label>
-              <input
-                type="url"
-                value={formData.socialLinks?.linkedin || ""}
-                onChange={(e) => updateSocial("linkedin", e.target.value)}
-                placeholder="https://linkedin.com/company/carhatbd"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">WhatsApp Direct Number (with Country Code)</label>
-              <input
-                type="text"
-                value={formData.socialLinks?.whatsapp || ""}
-                onChange={(e) => updateSocial("whatsapp", e.target.value)}
-                placeholder="+8801700000000"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ──── 3. Branding & Identity ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
-            <Globe size={20} className="text-blue-500" />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">Branding & Identity</h2>
-            <p className="text-xs text-muted-foreground">
-              Site name, logo, slogan, and copyright notice
-            </p>
-          </div>
-        </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Site Name</label>
-              <input
-                type="text"
-                value={formData.siteName}
-                onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Logo Image Path / URL</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={formData.logoUrl}
-                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                  placeholder="/car-hat-bd.png"
-                  className="flex-grow px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-                />
-                <div className="w-24 h-11 border border-border rounded-xl bg-muted/30 p-1 flex items-center justify-center flex-shrink-0">
-                  <Image
-                    src={formData.logoUrl || "/car-hat-bd.png"}
-                    alt="Logo preview"
-                    width={80}
-                    height={28}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
+      ) : tab === "listings" ? (
+        <div className="space-y-6">
+          <Panel title="New listings" subtitle="What happens when someone posts a car" action={<Car size={18} className="text-slate-text" aria-hidden />}>
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="New listings go" htmlFor="s-status">
+                  <select id="s-status" value={form.defaultListingStatus} onChange={(e) => set("defaultListingStatus", e.target.value as Form["defaultListingStatus"])} className={inputClass}>
+                    <option value="pending">To the review queue first</option>
+                    <option value="active">Live straight away</option>
+                  </select>
+                </Field>
+                <Field label="Photos allowed per listing" htmlFor="s-max" hint="Between 1 and 30.">
+                  <input id="s-max" type="number" min={1} max={30} value={form.maxImagesPerListing} onChange={(e) => set("maxImagesPerListing", Number(e.target.value))} className={inputClass} />
+                </Field>
               </div>
+              <SwitchRow title="Verified sellers skip the queue" description="When new listings wait for review, cars from verified accounts still go live straight away."
+                checked={form.autoApproveListings} onChange={(v) => set("autoApproveListings", v)} />
             </div>
+          </Panel>
+          <Panel title="SEO" subtitle="Titles, descriptions, keywords and the SEO score live on their own page">
+            <Link href="/admin/seo" className="inline-flex h-10 items-center gap-2 rounded-xl bg-electric px-4 text-sm font-semibold text-white shadow-glow hover:bg-electric-deep"><Search size={16} aria-hidden /> Open SEO &amp; content</Link>
+          </Panel>
+        </div>
+      ) : tab === "watermark" ? (
+        <WatermarkEditor value={form.watermark} siteName={form.siteName} onChange={(v) => set("watermark", v)} />
+      ) : (
+        <Panel title="Maintenance mode" subtitle="Take the public site offline while you make changes" action={<Wrench size={18} className="text-slate-text" aria-hidden />}>
+          <div className="space-y-4">
+            <SwitchRow title="Show the maintenance notice to visitors" description="Signed-in team members still see the full site, and the sign-in page stays open."
+              checked={form.maintenanceMode} onChange={(v) => set("maintenanceMode", v)} />
+            <Field label="Message visitors see" htmlFor="s-maint"><textarea id="s-maint" rows={3} value={form.maintenanceMessage} maxLength={300} onChange={(e) => set("maintenanceMessage", e.target.value)} className={cn(inputClass, "h-auto py-2")} /></Field>
           </div>
+        </Panel>
+      )}
+      <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setForm(saved)} />
+    </div>
+  );
+}
 
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Tagline / Mission Statement</label>
-            <input
-              type="text"
-              value={formData.tagline}
-              onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Copyright Text</label>
-            <input
-              type="text"
-              value={formData.copyrightText}
-              onChange={(e) => setFormData({ ...formData, copyrightText: e.target.value })}
-              placeholder="CarHat.bd. All rights reserved."
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ──── 4. Listing Moderation & Rules ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-            <Car size={20} className="text-verified" />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">Listing Policies & Limits</h2>
-            <p className="text-xs text-muted-foreground">
-              Control car listing approvals and photo allowances
-            </p>
-          </div>
-        </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Default New Listing Status</label>
-              <select
-                value={formData.defaultListingStatus}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    defaultListingStatus: e.target.value as "active" | "pending",
-                  })
-                }
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              >
-                <option value="pending">Pending (Requires Admin Review)</option>
-                <option value="active">Active (Auto-Publish immediately)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Max Photos Allowed Per Listing</label>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={formData.maxImagesPerListing}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    maxImagesPerListing: Number(e.target.value),
-                  })
-                }
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
-            <div>
-              <p className="text-sm font-semibold">Auto-Approve Verified Sellers</p>
-              <p className="text-xs text-muted-foreground">
-                Automatically approve new ads submitted by verified dealers and identity-checked sellers
-              </p>
-            </div>
-            <ToggleSwitch
-              enabled={formData.autoApproveListings}
-              onChange={(v) => setFormData({ ...formData, autoApproveListings: v })}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ──── 5. SEO Defaults ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
-            <Search size={20} className="text-teal-ink" />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">SEO & Meta Configuration</h2>
-            <p className="text-xs text-muted-foreground">
-              Search engine optimization meta title templates and snippets
-            </p>
-          </div>
-        </div>
-        <div className="p-6 space-y-5">
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Meta Title Template</label>
-            <input
-              type="text"
-              value={formData.metaTitleTemplate}
-              onChange={(e) => setFormData({ ...formData, metaTitleTemplate: e.target.value })}
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use <code className="bg-muted px-1.5 py-0.5 rounded text-primary font-mono">%s</code> as the page title placeholder
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Default Meta Description</label>
-            <textarea
-              rows={3}
-              value={formData.metaDescription}
-              onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })}
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none resize-none transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ──── 6. Maintenance Mode ──── */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/20">
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              formData.maintenanceMode ? "bg-red-500/10" : "bg-amber-500/10"
-            }`}
-          >
-            <AlertTriangle
-              size={20}
-              className={formData.maintenanceMode ? "text-red-500" : "text-amber-500"}
-            />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">Maintenance Mode</h2>
-            <p className="text-xs text-muted-foreground">
-              Temporarily take the public marketplace offline
-            </p>
-          </div>
-        </div>
-        <div className="p-6 space-y-5">
-          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
-            <div>
-              <p className="text-sm font-semibold">Enable Maintenance Mode</p>
-              <p className="text-xs text-muted-foreground">
-                When enabled, visitors will see a maintenance notice
-              </p>
-            </div>
-            <ToggleSwitch
-              enabled={formData.maintenanceMode}
-              onChange={(v) => setFormData({ ...formData, maintenanceMode: v })}
-            />
-          </div>
-          {formData.maintenanceMode && (
-            <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3 animate-fadeIn">
-              <p className="text-sm text-red-600 dark:text-red-400 font-bold flex items-center gap-1.5">
-                <AlertTriangle size={16} /> Maintenance mode is currently ACTIVE
-              </p>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Maintenance Notice Message</label>
-                <textarea
-                  rows={2}
-                  value={formData.maintenanceMessage}
-                  onChange={(e) => setFormData({ ...formData, maintenanceMessage: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none resize-none transition-all"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+function IconInput({ icon: Icon, children }: { icon: typeof Mail; children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <Icon size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-text" aria-hidden />
+      {children}
     </div>
   );
 }

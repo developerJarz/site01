@@ -76,7 +76,7 @@ async function sendViaSmtp(
 function buildOtpHtml(otpCode: string): string {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-      <h2 style="color: #3b82f6;">CarHat.bd Registration</h2>
+      <h2 style="color: #0e6aa8;">CarHat.bd Registration</h2>
       <p>Hello,</p>
       <p>Thank you for registering on CarHat.bd. Please use the verification code below to complete your registration.</p>
       <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0;">
@@ -113,7 +113,7 @@ export async function sendOtpEmail(email: string, otpCode: string) {
   console.log(`   SMTP_USER: ${smtpUser ? smtpUser.substring(0, 5) + "..." : "(not set)"}`);
   console.log(`   SMTP_PASS: ${smtpPass ? "set (" + smtpPass.length + " chars)" : "(not set)"}`);
   console.log(`   SMTP_FROM: ${smtpFrom || "(not set)"}`);
-  console.log(`   BREVO_API_KEY: ${brevoApiKey ? "set (" + brevoApiKey.substring(0, 8) + "...)" : "(not set)"}`);
+  console.log(`   BREVO_API_KEY: ${brevoApiKey ? "set" : "(not set)"}`);
 
   const errors: string[] = [];
 

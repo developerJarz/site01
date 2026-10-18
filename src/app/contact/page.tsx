@@ -1,194 +1,91 @@
-"use client";
+import Link from "next/link";
+import { BadgeCheck, Car, ChevronDown, Flag, KeyRound, Store } from "lucide-react";
+import { CONTAINER } from "@/components/ui/page";
+import { JsonLd, breadcrumbLd, faqLd } from "@/components/seo/JsonLd";
+import { absoluteUrl, loadSeoData } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { ContactForm } from "./ContactForm";
 
-import { useState } from "react";
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
-import { useSiteSettings } from "@/context/SiteSettingsContext";
+// Contact details come from Admin → Site settings; refresh the structured data hourly.
+export const revalidate = 3600;
 
-export default function ContactPage() {
-  const { settings } = useSiteSettings();
-  const [submitted, setSubmitted] = useState(false);
-  const [sending, setSending] = useState(false);
+const HELP = [
+  { icon: Car, title: "Buying a car", body: "Questions about a listing, a seller who isn't replying, or what to check before you pay.", href: "/faq#buying-a-car", link: "Buying FAQ" },
+  { icon: KeyRound, title: "Selling your car", body: "Help posting your ad, adding photos, pricing your car or uploading papers for the Paper Verified badge.", href: "/sell", link: "Post a free ad" },
+  { icon: Store, title: "Dealer partnerships", body: "Showrooms and reconditioned car dealers who want a showroom page and all their leads in one inbox.", href: "/dealers", link: "Dealer partners" },
+  { icon: Flag, title: "Report a problem", body: "A suspicious listing, a scam attempt or wrong information. Choose \"Report a listing\" in the form and we'll look into it.", href: "/faq#staying-safe", link: "Safety tips" },
+];
 
-  const contactInfo = [
-    {
-      icon: Mail,
-      label: "Email",
-      value: settings.contactEmail || "support@carhat.bd",
-      href: `mailto:${settings.contactEmail || "support@carhat.bd"}`,
-    },
-    {
-      icon: Phone,
-      label: "Phone",
-      value: settings.supportPhone || "+880 1700-000000",
-      href: `tel:${settings.supportPhone || "+8801700000000"}`,
-    },
-    {
-      icon: MapPin,
-      label: "Address",
-      value: settings.address || "Plot 12, Road 11, Block C, Gulshan-2, Dhaka 1212, Bangladesh",
-      href: settings.googleMapsUrl || "https://maps.google.com/?q=Gulshan-2,Dhaka,Bangladesh",
-    },
-    {
-      icon: Clock,
-      label: "Working Hours",
-      value: settings.workingHours || "Sat - Thu: 9:00 AM - 8:00 PM (Friday Closed)",
-      href: "#",
-    },
-  ];
+const CONTACT_FAQ = [
+  { q: "How quickly does CarHat reply?", a: "Our team in Dhaka usually replies the same working day. Messages sent outside our working hours (shown above) are answered on the next working day." },
+  { q: "Can CarHat help me with the BRTA name transfer?", a: "We can explain the process and the papers you need. The transfer itself is done by the buyer and seller with BRTA; see our FAQ for the steps." },
+  { q: "Can I visit CarHat to see a car?", a: "Cars are kept by their sellers, not at our office. Message the seller from the listing to arrange a viewing somewhere public and in daylight." },
+];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      setSubmitted(true);
-    }, 1000);
-  };
+export default async function ContactPage() {
+  const { globals } = await loadSeoData();
+  const pageUrl = absoluteUrl("/contact");
 
   return (
-    <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5" />
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Contact Us</h1>
-          <p className="text-lg text-muted-foreground">
-            Have questions about buying, selling, or dealership partnerships? We&apos;d love to hear from you.
+    <>
+      <JsonLd data={[
+        {
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          url: pageUrl,
+          name: "Contact CarHat BD",
+          mainEntity: {
+            "@type": "Organization",
+            "@id": `${absoluteUrl("/")}#organization`,
+            name: globals.siteName,
+            ...(globals.supportPhone ? { telephone: globals.supportPhone } : {}),
+            ...(globals.contactEmail ? { email: globals.contactEmail } : {}),
+            ...(globals.address ? { address: { "@type": "PostalAddress", streetAddress: globals.address, addressCountry: "BD" } } : {}),
+          },
+        },
+        breadcrumbLd([{ name: "Home", url: absoluteUrl("/") }, { name: "Contact", url: pageUrl }]),
+        faqLd(CONTACT_FAQ),
+      ]} />
+
+      <ContactForm />
+
+      <section aria-labelledby="help-heading" className="bg-mist py-16 md:py-20">
+        <div className={CONTAINER}>
+          <h2 id="help-heading" className="text-[1.9rem] font-extrabold leading-[1.1] text-night md:text-[2.4rem]">How we can help</h2>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {HELP.map(({ icon: Icon, title, body, href, link }) => (
+              <li key={title} className="flex flex-col rounded-3xl border border-hairline bg-white p-6 shadow-soft">
+                <span className="flex size-11 items-center justify-center rounded-2xl bg-haze text-electric"><Icon size={21} aria-hidden /></span>
+                <h3 className="mt-4 text-lg font-bold">{title}</h3>
+                <p className="mt-2 grow text-[15px] leading-relaxed text-slate-text">{body}</p>
+                <Link href={href} className="mt-4 text-sm font-semibold text-electric hover:underline">{link}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section aria-labelledby="contact-faq-heading" className={cn(CONTAINER, "grid gap-10 py-16 md:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]")}>
+        <div>
+          <BadgeCheck size={30} className="text-electric" aria-hidden />
+          <h2 id="contact-faq-heading" className="mt-3 text-[1.9rem] font-extrabold leading-[1.1] text-night md:text-[2.4rem]">Before you write to us</h2>
+          <p className="mt-4 text-[17px] leading-relaxed text-slate-text">
+            Many questions about buying and selling cars in Bangladesh are answered in our <Link href="/faq" className="font-semibold text-electric hover:underline">help centre</Link> and{" "}
+            <Link href="/blog" className="font-semibold text-electric hover:underline">car buying guides</Link>.
           </p>
         </div>
-      </section>
-
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-10">
-            {/* Contact Info Cards */}
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold mb-6">Get in Touch</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {contactInfo.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    target={item.href.startsWith("http") ? "_blank" : undefined}
-                    rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                    className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary transition-all group"
-                  >
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
-                      <item.icon size={20} className="text-primary" />
-                    </div>
-                    <p className="font-semibold mb-1">{item.label}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{item.value}</p>
-                  </a>
-                ))}
-              </div>
-
-              {/* Map Box */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <MapPin size={22} className="text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-foreground">Our Headquarters</h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {settings.address || "Gulshan-2, Dhaka 1212, Bangladesh"}
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href={settings.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(settings.address || "Gulshan-2, Dhaka, Bangladesh")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 text-sm font-semibold transition-colors"
-                >
-                  <ExternalLink size={16} /> Open in Google Maps
-                </a>
-              </div>
-            </div>
-
-            {/* Contact Form */}
-            <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
-              <h2 className="text-2xl font-bold mb-6">Send a Message</h2>
-              {submitted ? (
-                <div className="py-12 text-center space-y-4">
-                  <div className="w-14 h-14 bg-green-500/10 text-verified rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <h3 className="text-xl font-bold">Message Sent Successfully!</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    Thank you for reaching out. Our support team will review your message and get back to you shortly.
-                  </p>
-                  <button
-                    onClick={() => setSubmitted(false)}
-                    className="mt-4 px-6 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
-                  >
-                    Send Another Message
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">First Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="John"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Last Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Doe"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Email</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Subject</label>
-                    <select className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all">
-                      <option>General Inquiry</option>
-                      <option>Report a Listing</option>
-                      <option>Technical Support</option>
-                      <option>Dealer Partnership</option>
-                      <option>Advertising</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Message</label>
-                    <textarea
-                      rows={5}
-                      required
-                      placeholder="Write your message here..."
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none transition-all"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={sending}
-                    className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-card flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    {sending ? "Sending..." : "Send Message"}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
+        <div className="space-y-3">
+          {CONTACT_FAQ.map((item) => (
+            <details key={item.q} className="group rounded-2xl border border-hairline bg-white shadow-soft open:border-electric/20">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold text-night [&::-webkit-details-marker]:hidden">
+                <h3 className="text-[16px]">{item.q}</h3>
+                <ChevronDown size={18} className="shrink-0 text-slate-text transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <p className="px-5 pb-5 text-[15px] leading-relaxed text-slate-text">{item.a}</p>
+            </details>
+          ))}
         </div>
       </section>
-    </div>
+    </>
   );
 }

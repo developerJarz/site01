@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { User } from "@/lib/models/User";
@@ -6,8 +7,8 @@ import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const email = body.email?.toLowerCase().trim();
+    const body = await req.json().catch(() => ({}));
+    const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
 
     await connectToDatabase();
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("_id").lean();
 
     // Always return success to prevent email enumeration attacks
     if (!user) {
@@ -25,8 +26,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // One code per 45 seconds, so the form can't be used to flood someone's inbox.
+    const recent = await Otp.findOne({ email }).select("createdAt").lean();
+    if (recent && Date.now() - new Date(recent.createdAt).getTime() < 45_000) {
+      return NextResponse.json({ message: "If this email exists, a reset code has been sent." }, { status: 200 });
+    }
+
+    const otpCode = randomInt(100000, 1000000).toString();
 
     // Delete any existing OTPs for this email
     await Otp.deleteMany({ email });
@@ -48,7 +54,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Forgot Password Error:", error);
     return NextResponse.json(
-      { error: error.message || "Something went wrong" },
+      { error: "Something went wrong. Please try again." },
       { status: 500 }
     );
   }

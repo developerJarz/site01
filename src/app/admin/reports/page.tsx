@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { BarList, SERIES_COLORS } from "@/components/admin/Charts";
-import { Button, PageHeader, STATUS_LABEL, api } from "@/components/admin/ui";
+import { Download } from "lucide-react";
+import { Button, PageHeader, Panel, STATUS_LABEL, api, downloadCsv } from "@/components/admin/ui";
 import { formatLakh } from "@/lib/utils";
 
 interface ReportData {
@@ -55,7 +56,7 @@ export default function AdminReportsPage() {
 
   if (error) {
     return (
-      <div className="rounded-xl border border-border bg-card p-10 text-center">
+      <div className="rounded-3xl border border-hairline bg-white p-10 text-center shadow-soft">
         <p className="font-semibold">Reports couldn&apos;t load.</p>
         <p className="mt-1 text-muted-foreground">{error}</p>
         <Button className="mt-4" variant="primary" onClick={load}>Try again</Button>
@@ -68,7 +69,7 @@ export default function AdminReportsPage() {
       <div className="space-y-5">
         <div className="skeleton h-10 w-60 rounded" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-56 rounded-xl" />)}
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-56 rounded-3xl" />)}
         </div>
       </div>
     );
@@ -95,6 +96,20 @@ export default function AdminReportsPage() {
       <PageHeader
         title="Reports"
         description={`All time: ${totalListings.toLocaleString("en-IN")} listings and ${totalUsers.toLocaleString("en-IN")} accounts.`}
+        actions={
+          <Button variant="primary" onClick={() => downloadCsv(`carhat-report-${new Date().toISOString().slice(0, 10)}.csv`, ["Section", "Item", "Count", "Average price (BDT)"], [
+            ...data.byStatus.map((r) => ["Listings by status", label(r._id), r.count, ""]),
+            ...data.byCondition.map((r) => ["Listings by condition", label(r._id), r.count, ""]),
+            ...data.byFuelType.map((r) => ["Listings by fuel", label(r._id), r.count, ""]),
+            ...data.byMake.map((r) => ["Listings by make", r._id || "Not set", r.count, Math.round(r.avgPrice || 0)]),
+            ...data.priceRanges.map((r) => ["Asking prices", priceRangeLabel(r._id), r.count, ""]),
+            ...data.byRole.map((r) => ["Accounts by role", label(r._id), r.count, ""]),
+            ...monthly.flatMap((m) => [["New listings by month", m.label, m.listings, ""], ["New accounts by month", m.label, m.users, ""]]),
+            ...data.topPerforming.map((t) => ["Most viewed", t.title, t.views, t.price]),
+          ])}>
+            <Download size={16} aria-hidden /> Export CSV
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -135,13 +150,13 @@ export default function AdminReportsPage() {
         <Panel title="New each month" flush>
           <table className="w-full text-sm">
             <thead className="text-left text-[13px] text-muted-foreground">
-              <tr className="border-b border-border">
+              <tr className="border-b border-hairline">
                 <th className="py-2 pl-5 font-semibold">Month</th>
                 <th className="py-2 text-right font-semibold">Listings</th>
                 <th className="py-2 pr-5 text-right font-semibold">Accounts</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border tabular">
+            <tbody className="divide-y divide-hairline tabular">
               {monthly.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-5 py-6 text-muted-foreground">No activity yet.</td>
@@ -159,11 +174,11 @@ export default function AdminReportsPage() {
         </Panel>
 
         <Panel title="Most viewed listings" flush>
-          <ol className="divide-y divide-border">
+          <ol className="divide-y divide-hairline">
             {data.topPerforming.map((item, i) => (
               <li key={item._id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
                 <span className="w-5 font-semibold text-muted-foreground tabular">{i + 1}</span>
-                <Link href={`/cars/${item.slug}`} target="_blank" className="min-w-0 grow truncate font-semibold hover:text-primary">
+                <Link href={`/cars/${item.slug}`} target="_blank" className="min-w-0 grow truncate font-semibold hover:text-electric">
                   {item.title}
                 </Link>
                 <span className="shrink-0 text-muted-foreground tabular">{item.views.toLocaleString("en-IN")} views</span>
@@ -173,17 +188,5 @@ export default function AdminReportsPage() {
         </Panel>
       </div>
     </div>
-  );
-}
-
-function Panel({ title, subtitle, children, flush }: { title: string; subtitle?: string; children: React.ReactNode; flush?: boolean }) {
-  return (
-    <section className="rounded-xl border border-border bg-card">
-      <div className="px-5 pt-4">
-        <h2 className="text-base font-bold">{title}</h2>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-      </div>
-      <div className={flush ? "mt-2" : "px-5 pb-5 pt-4"}>{children}</div>
-    </section>
   );
 }

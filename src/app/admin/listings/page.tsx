@@ -29,11 +29,13 @@ import {
   STATUS_LABEL,
   StatusBadge,
   api,
+  downloadCsv,
   inputClass,
   useConfirm,
 } from "@/components/admin/ui";
 import { useToast } from "@/components/admin/Toast";
 import { cn, formatLakh, formatTaka, timeAgo } from "@/lib/utils";
+import { autoListingDescription, autoListingTitle, listingImageAlt } from "@/lib/seo-text";
 
 interface Listing {
   _id: string;
@@ -57,6 +59,8 @@ interface Listing {
   paperVerified?: boolean;
   paperVerifiedAt?: string;
   paperVerificationNote?: string;
+  seoTitle?: string;
+  seoDescription?: string;
   thumb?: string;
   imageCount: number;
   docCount: number;
@@ -110,6 +114,8 @@ function ListingsManager() {
   const featured = params.get("featured") === "1";
   const sort = params.get("sort") || "newest";
   const page = Number(params.get("page")) || 1;
+  // Set by the "listings" link in Admin → Users.
+  const seller = params.get("seller") || "";
 
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,10 +148,11 @@ function ListingsManager() {
     if (papers) p.set("papers", papers);
     if (featured) p.set("featured", "1");
     if (sort !== "newest") p.set("sort", sort);
+    if (seller) p.set("seller", seller);
     p.set("page", String(page));
     p.set("limit", "20");
     return p.toString();
-  }, [status, q, papers, featured, sort, page]);
+  }, [status, q, papers, featured, sort, page, seller]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -261,18 +268,8 @@ function ListingsManager() {
         if (p >= res.pages) break;
       }
       const header = ["Title", "Make", "Model", "Year", "Price (BDT)", "Status", "Condition", "Location", "Views", "Featured", "Paper Verified", "Papers", "Seller", "Seller email", "Listed", "URL"];
-      const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const lines = rows.map((l) =>
-        [l.title, l.make, l.model, l.year, l.price, STATUS_LABEL[l.status] || l.status, l.condition, l.location, l.views, l.featured ? "Yes" : "No", l.paperVerified ? "Yes" : "No", l.docCount, l.sellerId?.name, l.sellerId?.email, new Date(l.createdAt).toISOString().slice(0, 10), `${window.location.origin}/cars/${l.slug}`]
-          .map(esc)
-          .join(",")
-      );
-      const blob = new Blob(["﻿" + [header.map(esc).join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `carhat-listings-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadCsv(`carhat-listings-${new Date().toISOString().slice(0, 10)}.csv`, header, rows.map((l) =>
+        [l.title, l.make, l.model, l.year, l.price, STATUS_LABEL[l.status] || l.status, l.condition, l.location, l.views, l.featured ? "Yes" : "No", l.paperVerified ? "Yes" : "No", l.docCount, l.sellerId?.name, l.sellerId?.email, new Date(l.createdAt).toISOString().slice(0, 10), `${window.location.origin}/cars/${l.slug}`]));
       toast.success(`Exported ${rows.length} listings.`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -315,6 +312,12 @@ function ListingsManager() {
       />
 
       <CountTabs label="Filter by status" tabs={tabs} value={status} onChange={(v) => setParams({ status: v === "all" ? undefined : v })} />
+      {seller && (
+        <p className="flex w-fit items-center gap-2 rounded-full bg-haze py-1 pl-3 pr-1 text-sm font-semibold text-electric-deep">
+          Showing one seller&apos;s cars
+          <button type="button" onClick={() => setParams({ seller: undefined })} className="rounded-full px-2 py-0.5 hover:bg-white" aria-label="Show all sellers">✕</button>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[14rem] grow sm:max-w-sm">
@@ -339,10 +342,10 @@ function ListingsManager() {
           onClick={() => setParams({ featured: featured ? undefined : "1" })}
           className={cn(
             "inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold",
-            featured ? "border-marigold bg-[#fdf3dc] text-[#7a5200]" : "border-input bg-card hover:bg-muted"
+            featured ? "border-warning/30 bg-warning-soft text-warning" : "border-hairline bg-white hover:bg-mist"
           )}
         >
-          <Star size={15} className={featured ? "fill-marigold text-[#b27c00]" : ""} aria-hidden /> Featured
+          <Star size={15} className={featured ? "fill-[#f59e0b] text-[#d97706]" : ""} aria-hidden /> Featured
         </button>
         <select value={sort} onChange={(e) => setParams({ sort: e.target.value === "newest" ? undefined : e.target.value })} aria-label="Sort" className={cn(inputClass, "w-auto")}>
           {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -403,7 +406,7 @@ function ListingsManager() {
                           <div className="min-w-0">
                             <p className="flex items-center gap-1.5">
                               <span className="max-w-[16rem] truncate font-semibold" title={l.title}>{l.title}</span>
-                              {l.featured && <Star size={14} className="shrink-0 fill-marigold text-[#b27c00]" aria-label="Featured" />}
+                              {l.featured && <Star size={14} className="shrink-0 fill-[#f59e0b] text-[#d97706]" aria-label="Featured" />}
                             </p>
                             <p className="text-muted-foreground">
                               <span className="font-semibold text-foreground tabular">{formatLakh(l.price)}</span>, {l.year} {l.make}, {l.location}
@@ -485,7 +488,7 @@ function ListingsManager() {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="animate-in fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-xl bg-ink-deep p-2.5 pl-4 text-white shadow-pop lg:left-[calc(16rem+1.5rem)]">
+        <div className="animate-in fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-2xl bg-night p-2.5 pl-4 text-white shadow-pop lg:left-[calc(17rem+1.5rem)]">
           <p className="mr-auto text-sm font-semibold tabular">{selected.size} selected</p>
           <BulkButton onClick={() => bulk({ status: "active" }, "{n} listings are live.")} disabled={busy === "bulk"}>Approve</BulkButton>
           <BulkButton onClick={() => bulk({ status: "sold" }, "{n} listings marked sold.")} disabled={busy === "bulk"}>Mark sold</BulkButton>
@@ -590,7 +593,7 @@ function RowActions({ listing, busy, onFeature, onEdit, onDelete }: { listing: L
   return (
     <div className="flex items-center justify-end gap-0.5">
       <button onClick={onFeature} disabled={busy} className={icon} aria-label={listing.featured ? "Remove from featured" : "Mark as featured"} title={listing.featured ? "Remove from featured" : "Mark as featured"}>
-        <Star size={17} className={listing.featured ? "fill-marigold text-[#b27c00]" : ""} />
+        <Star size={17} className={listing.featured ? "fill-[#f59e0b] text-[#d97706]" : ""} />
       </button>
       <button onClick={onEdit} className={icon} aria-label={`Edit ${listing.title}`} title="Edit">
         <Pencil size={17} />
@@ -623,10 +626,21 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
     color: listing.color || "",
     location: listing.location || "",
     featured: !!listing.featured,
+    seoTitle: listing.seoTitle || "",
+    seoDescription: listing.seoDescription || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+  // Photos and their alt text load with the modal; null until then so an unloaded list is never saved.
+  const [photos, setPhotos] = useState<string[] | null>(null);
+  const [alts, setAlts] = useState<string[]>([]);
+  useEffect(() => {
+    api<{ images: string[]; imageAlts: string[] }>(`/api/admin/listings?id=${listing._id}`)
+      .then((d) => { setPhotos(d.images || []); setAlts((d.images || []).map((_, i) => d.imageAlts?.[i] || "")); })
+      .catch(() => setPhotos(null));
+  }, [listing._id]);
+  const seoCar = { ...form, paperVerified: listing.paperVerified, imageAlts: [] as string[] };
 
   const save = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -635,7 +649,7 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
     setSaving(true);
     setError("");
     try {
-      await api("/api/admin/listings", { method: "PATCH", body: JSON.stringify({ id: listing._id, ...form }) });
+      await api("/api/admin/listings", { method: "PATCH", body: JSON.stringify({ id: listing._id, ...form, ...(photos ? { imageAlts: alts } : {}) }) });
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -742,6 +756,35 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
             <span className="block text-sm text-muted-foreground">Shown first in search results and on the home page.</span>
           </span>
         </label>
+        <fieldset className="space-y-4 rounded-2xl border border-hairline p-4 sm:col-span-6">
+          <legend className="px-1 text-sm font-bold">Search &amp; SEO</legend>
+          <p className="text-sm text-muted-foreground">Leave empty to use the automatic text shown in grey, generated from the car details.</p>
+          <Field label={`SEO title (${form.seoTitle.length}/60)`} htmlFor="e-seo-title">
+            <input id="e-seo-title" value={form.seoTitle} onChange={(e) => set("seoTitle", e.target.value)} placeholder={autoListingTitle(seoCar)} className={inputClass} />
+          </Field>
+          <Field label={`Meta description (${form.seoDescription.length}/158)`} htmlFor="e-seo-desc">
+            <textarea id="e-seo-desc" rows={2} value={form.seoDescription} onChange={(e) => set("seoDescription", e.target.value)} placeholder={autoListingDescription(seoCar)} className={cn(inputClass, "h-auto py-2")} />
+          </Field>
+          <div>
+            <p className="field-label">Photo alt text</p>
+            {photos === null ? (
+              <div className="skeleton h-16 rounded-xl" />
+            ) : photos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">This listing has no photos.</p>
+            ) : (
+              <ul className="space-y-2">
+                {photos.map((src, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-mist"><CarImage src={src} alt="" sizes="64px" /></span>
+                    <label htmlFor={`e-alt-${i}`} className="sr-only">Alt text for photo {i + 1}</label>
+                    <input id={`e-alt-${i}`} value={alts[i] || ""} onChange={(e) => setAlts((a) => a.map((v, j) => (j === i ? e.target.value : v)))}
+                      placeholder={listingImageAlt(seoCar, i)} className={inputClass} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </fieldset>
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
       </form>
     </Modal>
@@ -859,7 +902,7 @@ function PapersInspector({
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
           <div>
-            <div className="flex h-[min(60vh,32rem)] items-center justify-center overflow-hidden rounded-lg bg-ink-deep">
+            <div className="flex h-[min(60vh,32rem)] items-center justify-center overflow-hidden rounded-2xl bg-night">
               {isPdf(active) ? (
                 <iframe src={urls[active]} title={`Paper ${active + 1}`} className="h-full w-full bg-white" />
               ) : (
@@ -882,7 +925,7 @@ function PapersInspector({
                     aria-pressed={active === i}
                     className={cn(
                       "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium",
-                      active === i ? "bg-ink text-white" : "bg-muted hover:bg-secondary"
+                      active === i ? "bg-night text-white" : "bg-mist hover:bg-haze"
                     )}
                   >
                     {isPdf(i) ? <FileText size={15} aria-hidden /> : <Eye size={15} aria-hidden />}

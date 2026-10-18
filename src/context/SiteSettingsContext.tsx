@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { DEFAULT_APPEARANCE, resolveAppearance, type AppearanceSettings } from "@/lib/site-config";
 
 export interface SocialLinks {
   facebook: string;
@@ -27,14 +28,17 @@ export interface SiteSettingsState {
   maxImagesPerListing: number;
   metaTitleTemplate: string;
   metaDescription: string;
+  seoKeywords?: string;
+  defaultOgImage?: string;
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  appearance: AppearanceSettings;
 }
 
 export const DEFAULT_SETTINGS: SiteSettingsState = {
   siteName: "CarHat.bd",
   tagline: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
-  contactEmail: "support@carhat.bd",
+  contactEmail: "carhatbd@gmail.com",
   supportPhone: "+880 1700-000000",
   address: "Plot 12, Road 11, Block C, Gulshan-2, Dhaka 1212, Bangladesh",
   workingHours: "Sat - Thu: 9:00 AM - 8:00 PM (Friday Closed)",
@@ -52,12 +56,24 @@ export const DEFAULT_SETTINGS: SiteSettingsState = {
   defaultListingStatus: "pending",
   autoApproveListings: false,
   maxImagesPerListing: 10,
-  metaTitleTemplate: "%s | CarHat.bd - Modern Car Marketplace",
+  metaTitleTemplate: "%s | CarHat BD",
   metaDescription:
     "Buy, sell, and explore the best cars in Bangladesh on CarHat.bd. Find your perfect car with verified dealers and private sellers.",
   maintenanceMode: false,
   maintenanceMessage: "We're currently performing maintenance. Please check back soon!",
+  appearance: DEFAULT_APPEARANCE,
 };
+
+/** Defaults first, then whatever was saved; nested objects are merged so old caches stay usable. */
+function mergeSettings(base: SiteSettingsState, incoming: Partial<SiteSettingsState> | undefined): SiteSettingsState {
+  if (!incoming) return base;
+  return {
+    ...base,
+    ...incoming,
+    socialLinks: { ...base.socialLinks, ...(incoming.socialLinks || {}) },
+    appearance: incoming.appearance ? resolveAppearance(incoming.appearance) : base.appearance,
+  };
+}
 
 interface SiteSettingsContextType {
   settings: SiteSettingsState;
@@ -83,14 +99,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
       if (res.ok) {
         const data = await res.json();
         if (data.settings) {
-          setSettings((prev) => ({
-            ...DEFAULT_SETTINGS,
-            ...data.settings,
-            socialLinks: {
-              ...DEFAULT_SETTINGS.socialLinks,
-              ...(data.settings.socialLinks || {}),
-            },
-          }));
+          setSettings(mergeSettings(DEFAULT_SETTINGS, data.settings));
         }
       }
     } catch (error) {
@@ -102,14 +111,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
 
   const updateLiveSettings = useCallback((newSettings: Partial<SiteSettingsState>) => {
     setSettings((prev) => {
-      const updated = {
-        ...prev,
-        ...newSettings,
-        socialLinks: {
-          ...prev.socialLinks,
-          ...(newSettings.socialLinks || {}),
-        },
-      };
+      const updated = mergeSettings(prev, newSettings);
       // Dispatch custom event for real-time syncing within the page
       if (typeof window !== "undefined") {
         window.dispatchEvent(
@@ -130,14 +132,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
         const cached = localStorage.getItem("carhat_site_settings");
         if (cached) {
           const parsed = JSON.parse(cached);
-          setSettings((prev) => ({
-            ...DEFAULT_SETTINGS,
-            ...parsed,
-            socialLinks: {
-              ...DEFAULT_SETTINGS.socialLinks,
-              ...(parsed.socialLinks || {}),
-            },
-          }));
+          setSettings(mergeSettings(DEFAULT_SETTINGS, parsed));
         }
       } catch {}
     }
@@ -147,14 +142,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
     // Listen for instant in-browser updates
     const handleSettingsUpdated = (event: any) => {
       if (event.detail) {
-        setSettings((prev) => ({
-          ...prev,
-          ...event.detail,
-          socialLinks: {
-            ...prev.socialLinks,
-            ...(event.detail.socialLinks || {}),
-          },
-        }));
+        setSettings((prev) => mergeSettings(prev, event.detail));
       }
     };
 
@@ -163,14 +151,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
       if (event.key === "carhat_site_settings" && event.newValue) {
         try {
           const parsed = JSON.parse(event.newValue);
-          setSettings((prev) => ({
-            ...DEFAULT_SETTINGS,
-            ...parsed,
-            socialLinks: {
-              ...DEFAULT_SETTINGS.socialLinks,
-              ...(parsed.socialLinks || {}),
-            },
-          }));
+          setSettings(mergeSettings(DEFAULT_SETTINGS, parsed));
         } catch {}
       }
     };

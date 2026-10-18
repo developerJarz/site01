@@ -1,270 +1,334 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useId, useState } from "react";
+import {
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, LabelList, Pie, PieChart, PolarAngleAxis, PolarGrid,
+  PolarRadiusAxis, Radar, RadarChart, RadialBar, RadialBarChart, XAxis, YAxis,
+} from "recharts";
+import {
+  ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig,
+} from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 
 /*
- * Chart palette (validated with the dataviz palette checker against #ffffff):
- * cobalt #0B4FA8 / teal #1596A8 — CVD ΔE 20.4, normal ΔE 20.9, both ≥ 3:1 contrast.
- * Fixed order: series 1 is always cobalt, series 2 always teal.
+ * Chart palette, validated with the dataviz palette checker against white (light-only site):
+ * brand ocean #0E6AA8 / orange #D9480F / emerald #0D9668. All-pairs CVD ΔE ≥ 10, normal-vision ΔE ≥ 19, all ≥ 3:1.
+ * (The logo teal is too close to the brand blue to share a chart.) Fixed order: brand, orange, emerald. No fourth hue clears the
+ * all-pairs floors, so part-to-whole charts fold everything past three slices into a neutral "Other".
  */
-export const SERIES_COLORS = ["#0b4fa8", "#1596a8"];
-const GRID = "#e3e9f0";
-const AXIS_TEXT = "#4a5a6e";
-
-function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, width] as const;
-}
-
-/** Round the axis max up to a clean number and return 4–5 evenly spaced ticks. */
-function niceTicks(max: number) {
-  if (max <= 4) return [0, 1, 2, 3, 4];
-  const rough = max / 4;
-  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= rough) || rough;
-  const ticks: number[] = [];
-  for (let v = 0; v <= max + step * 0.001; v += step) ticks.push(Math.round(v));
-  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
-  return ticks;
-}
+export const SERIES_COLORS = ["#0e6aa8", "#d9480f", "#0d9668"];
+export const OTHER_COLOR = "#94a3b8";
 
 const shortDate = (iso: string) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const longDate = (iso: string) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const num = (v: number) => v.toLocaleString("en-IN");
 
 interface Series {
   name: string;
   data: { date: string; count: number }[];
 }
 
-export function LineChart({ series, height = 240 }: { series: Series[]; height?: number }) {
-  const [wrapRef, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number | null>(null);
-  const [showTable, setShowTable] = useState(false);
-
-  const points = series[0]?.data.length || 0;
-  const pad = { top: 12, right: 16, bottom: 28, left: 36 };
-  const w = Math.max(0, width - pad.left - pad.right);
-  const h = height - pad.top - pad.bottom;
-  const max = Math.max(1, ...series.flatMap((s) => s.data.map((d) => d.count)));
-  const ticks = niceTicks(max);
-  const yMax = ticks[ticks.length - 1];
-  const x = (i: number) => (points <= 1 ? w / 2 : (i / (points - 1)) * w);
-  const y = (v: number) => h - (v / yMax) * h;
-
-  const paths = useMemo(
-    () =>
-      series.map((s) => s.data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.count).toFixed(1)}`).join("")),
-    [series, w, h, yMax]
+/** Toggle between the plot and an equivalent table, so no reading depends on the plot alone. */
+function TableToggle({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={shown} className="mt-2 text-xs font-semibold text-slate-text underline-offset-2 hover:text-electric hover:underline">
+      {shown ? "Show chart" : "Show as table"}
+    </button>
   );
+}
 
-  // Show ~6 date labels whatever the range.
-  const labelEvery = Math.max(1, Math.ceil(points / 6));
-  const totals = series.map((s) => s.data.reduce((a, d) => a + d.count, 0));
+/** Daily trend for 1–3 series: shadcn area chart with gradient fills, crosshair tooltip and legend. */
+export function LineChart({ series, height = 260, stacked = false }: { series: Series[]; height?: number; stacked?: boolean }) {
+  const gradient = useId().replace(/:/g, "");
+  const [showTable, setShowTable] = useState(false);
+  const config: ChartConfig = Object.fromEntries(series.map((s, i) => [`s${i}`, { label: s.name, color: SERIES_COLORS[i] }]));
+  const rows = (series[0]?.data || []).map((d, i) => ({
+    date: d.date,
+    ...Object.fromEntries(series.map((s, j) => [`s${j}`, s.data[i]?.count ?? 0])),
+  }));
 
-  const onMove = (clientX: number, rect: DOMRect) => {
-    if (points === 0) return;
-    const rel = clientX - rect.left - pad.left;
-    setHover(Math.max(0, Math.min(points - 1, Math.round((rel / Math.max(1, w)) * (points - 1)))));
-  };
+  if (!rows.length) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          {series.map((s, i) => (
-            <li key={s.name} className="flex items-center gap-2">
-              <span className="h-0.5 w-4 rounded-full" style={{ background: SERIES_COLORS[i] }} aria-hidden />
-              <span className="text-muted-foreground">{s.name}</span>
-              <span className="font-semibold tabular">{totals[i].toLocaleString("en-IN")}</span>
-            </li>
-          ))}
-        </ul>
-        <button onClick={() => setShowTable((v) => !v)} className="text-sm font-semibold text-primary hover:underline">
-          {showTable ? "Show chart" : "Show as table"}
-        </button>
-      </div>
-
       {showTable ? (
-        <div className="relative max-h-[260px] overflow-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-muted text-left">
-              <tr>
-                <th className="px-3 py-2 font-semibold">Date</th>
-                {series.map((s) => <th key={s.name} className="px-3 py-2 text-right font-semibold">{s.name}</th>)}
-              </tr>
+        <div className="max-h-[320px] overflow-auto rounded-xl border border-hairline">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+              <tr><th scope="col" className="px-3 py-2">Date</th>{series.map((s) => <th key={s.name} scope="col" className="px-3 py-2 text-right">{s.name}</th>)}</tr>
             </thead>
-            <tbody className="divide-y divide-border tabular">
-              {series[0]?.data.map((d, i) => (
-                <tr key={d.date}>
-                  <td className="px-3 py-1.5">{shortDate(d.date)}</td>
-                  {series.map((s) => <td key={s.name} className="px-3 py-1.5 text-right">{s.data[i].count}</td>)}
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.date} className="border-t border-hairline">
+                  <th scope="row" className="px-3 py-1.5 font-medium">{shortDate(r.date)}</th>
+                  {series.map((s, j) => <td key={s.name} className="px-3 py-1.5 text-right tabular">{num((r as Record<string, number | string>)[`s${j}`] as number)}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <div ref={wrapRef} className="relative" style={{ height }}>
-          {width > 0 && (
-            <svg
-              width={width}
-              height={height}
-              role="img"
-              aria-label={`${series.map((s, i) => `${s.name}: ${totals[i]}`).join(", ")}. Use arrow keys to read each day.`}
-              tabIndex={0}
-              className="block touch-pan-y outline-none focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-ring"
-              onPointerMove={(e) => onMove(e.clientX, e.currentTarget.getBoundingClientRect())}
-              onPointerLeave={() => setHover(null)}
-              onBlur={() => setHover(null)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight") setHover((i) => Math.min(points - 1, (i ?? -1) + 1));
-                if (e.key === "ArrowLeft") setHover((i) => Math.max(0, (i ?? points) - 1));
-              }}
-            >
-              <g transform={`translate(${pad.left},${pad.top})`}>
-                {ticks.map((t) => (
-                  <g key={t}>
-                    <line x1={0} x2={w} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth={1} />
-                    <text x={-8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={12} fill={AXIS_TEXT} className="tabular">
-                      {t.toLocaleString("en-IN")}
-                    </text>
-                  </g>
-                ))}
-                {series[0]?.data.map((d, i) =>
-                  i % labelEvery === 0 || i === points - 1 ? (
-                    <text key={d.date} x={x(i)} y={h + 19} textAnchor={i === 0 ? "start" : i === points - 1 ? "end" : "middle"} fontSize={12} fill={AXIS_TEXT}>
-                      {shortDate(d.date)}
-                    </text>
-                  ) : null
-                )}
-
-                {/* Area wash under the first series only, so the two lines stay distinct. */}
-                {series[0] && points > 1 && (
-                  <path d={`${paths[0]}L${x(points - 1)},${h}L0,${h}Z`} fill={SERIES_COLORS[0]} opacity={0.08} />
-                )}
-                {paths.map((d, i) => (
-                  <path key={series[i].name} d={d} fill="none" stroke={SERIES_COLORS[i]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                ))}
-
-                {hover === null
-                  ? series.map((s, i) =>
-                      points > 0 ? (
-                        <circle key={s.name} cx={x(points - 1)} cy={y(s.data[points - 1].count)} r={4} fill={SERIES_COLORS[i]} stroke="#fff" strokeWidth={2} />
-                      ) : null
-                    )
-                  : (
-                    <g>
-                      <line x1={x(hover)} x2={x(hover)} y1={0} y2={h} stroke={AXIS_TEXT} strokeWidth={1} opacity={0.5} />
-                      {series.map((s, i) => (
-                        <circle key={s.name} cx={x(hover)} cy={y(s.data[hover].count)} r={4.5} fill={SERIES_COLORS[i]} stroke="#fff" strokeWidth={2} />
-                      ))}
-                    </g>
-                  )}
-              </g>
-            </svg>
-          )}
-
-          {hover !== null && series[0] && (
-            <div
-              className="pointer-events-none absolute top-0 z-10 min-w-[10rem] rounded-lg border border-border bg-popover px-3 py-2 text-sm shadow-lift"
-              style={{
-                left: Math.min(Math.max(0, pad.left + x(hover) - 80), Math.max(0, width - 170)),
-              }}
-              role="status"
-            >
-              <p className="font-semibold">{shortDate(series[0].data[hover].date)}</p>
-              {series.map((s, i) => (
-                <p key={s.name} className="mt-1 flex items-center gap-2">
-                  <span className="h-0.5 w-3 rounded-full" style={{ background: SERIES_COLORS[i] }} aria-hidden />
-                  <span className="font-semibold tabular">{s.data[hover].count}</span>
-                  <span className="text-muted-foreground">{s.name.toLowerCase()}</span>
-                </p>
+        <ChartContainer config={config} className="aspect-auto w-full" style={{ height }}>
+          <AreaChart data={rows} margin={{ left: 0, right: 8, top: 8 }} accessibilityLayer>
+            <defs>
+              {series.map((_, i) => (
+                <linearGradient key={i} id={`${gradient}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={`var(--color-s${i})`} stopOpacity={series.length > 1 ? 0.16 : 0.28} />
+                  <stop offset="95%" stopColor={`var(--color-s${i})`} stopOpacity={0.01} />
+                </linearGradient>
               ))}
-            </div>
-          )}
-        </div>
+            </defs>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={shortDate} />
+            <YAxis tickLine={false} axisLine={false} width={40} allowDecimals={false} tickFormatter={(v: number) => num(v)} />
+            <ChartTooltip cursor content={<ChartTooltipContent indicator="line" labelFormatter={(_, p) => longDate(String(p?.[0]?.payload?.date || ""))} />} />
+            {series.map((_, i) => (
+              <Area key={i} dataKey={`s${i}`} type="monotone" stackId={stacked ? "a" : undefined} stroke={`var(--color-s${i})`} strokeWidth={2}
+                fill={`url(#${gradient}-${i})`} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} />
+            ))}
+            {series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
+          </AreaChart>
+        </ChartContainer>
       )}
+      <TableToggle shown={showTable} onToggle={() => setShowTable((v) => !v)} />
     </div>
   );
 }
 
+type Row = { label: string; value: number; key?: string };
+
 /**
- * Horizontal single-series bars: label left, value at the tip.
- * Bars cap at 20px thick with a 4px rounded data end.
+ * Horizontal single-series bars (shadcn "Bar Chart - Horizontal" with value labels).
+ * Category labels are focusable when the bars open something, so keyboard users can drill in too.
  */
 export function BarList({
   rows,
   color = SERIES_COLORS[0],
-  format = (v) => v.toLocaleString("en-IN"),
+  format = num,
   detail,
   onSelect,
 }: {
-  rows: { label: string; value: number; key?: string }[];
+  rows: Row[];
   color?: string;
   format?: (v: number) => string;
-  detail?: (row: { label: string; value: number; key?: string }) => string | undefined;
-  onSelect?: (row: { label: string; value: number; key?: string }) => void;
+  detail?: (row: Row) => string | undefined;
+  onSelect?: (row: Row) => void;
 }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  const [active, setActive] = useState<number | null>(null);
-
   if (rows.length === 0) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
+  const config: ChartConfig = { value: { label: "Count", color } };
+  const data = rows.map((r) => ({ ...r, name: r.label }));
 
   return (
-    <ul className="space-y-2.5">
-      {rows.map((r, i) => {
-        const Tag = onSelect ? "button" : "div";
-        return (
-          <li key={r.key || r.label}>
-            <Tag
-              {...(onSelect ? { type: "button" as const, onClick: () => onSelect(r) } : {})}
-              onMouseEnter={() => setActive(i)}
-              onMouseLeave={() => setActive(null)}
-              onFocus={() => setActive(i)}
-              onBlur={() => setActive(null)}
-              className={cn(
-                "grid w-full grid-cols-[7.5rem_1fr] items-center gap-3 rounded-md text-left text-sm",
-                onSelect && "hover:bg-muted/60"
-              )}
-            >
-              <span className="truncate font-medium">{r.label}</span>
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  className="h-5 shrink-0 rounded-r"
-                  style={{ width: r.value > 0 ? `max(3px, ${(r.value / max) * 82}%)` : 0, background: color, opacity: active === null || active === i ? 1 : 0.45 }}
-                  aria-hidden
-                />
-                <span className="shrink-0 font-semibold tabular">{format(r.value)}</span>
-                {active === i && detail?.(r) && (
-                  <span className="truncate text-muted-foreground">{detail(r)}</span>
-                )}
-              </span>
-            </Tag>
-          </li>
-        );
-      })}
-    </ul>
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: rows.length * 34 + 8 }}>
+      <BarChart data={data} layout="vertical" margin={{ left: 0, right: 48, top: 0, bottom: 0 }} barCategoryGap={6} accessibilityLayer>
+        <XAxis type="number" dataKey="value" hide />
+        <YAxis
+          type="category" dataKey="label" tickLine={false} axisLine={false} width={116} interval={0}
+          tick={(props: { x: number | string; y: number | string; payload: { value: string; index: number } }) => (
+            <CategoryTick {...props} row={rows[props.payload.index]} onSelect={onSelect} />
+          )}
+        />
+        <ChartTooltip cursor={false}
+          content={<ChartTooltipContent hideIndicator formatter={(value, _name, item) => (
+            <span className="flex w-full justify-between gap-4">
+              <span className="text-slate-text">{String(item.payload?.label)}</span>
+              <span className="font-bold text-night tabular">{format(Number(value))}{detail?.(item.payload as Row) ? <span className="ml-1.5 font-normal text-slate-text">{detail(item.payload as Row)}</span> : null}</span>
+            </span>
+          )} />} />
+        <Bar dataKey="value" fill="var(--color-value)" radius={[0, 4, 4, 0]} maxBarSize={20} minPointSize={3}
+          className={onSelect ? "cursor-pointer" : undefined}
+          onClick={onSelect ? (_: unknown, index: number) => onSelect(rows[index]) : undefined}>
+          <LabelList dataKey="value" position="right" offset={8} className="fill-night font-semibold" fontSize={12} formatter={(v: unknown) => format(Number(v))} />
+        </Bar>
+      </BarChart>
+    </ChartContainer>
   );
 }
 
-/** Tiny trend line for a stat tile. */
-export function Sparkline({ values, color = SERIES_COLORS[0] }: { values: number[]; color?: string }) {
-  if (values.length < 2) return null;
-  const max = Math.max(1, ...values);
-  const W = 96, H = 28;
-  const d = values.map((v, i) => `${i === 0 ? "M" : "L"}${((i / (values.length - 1)) * W).toFixed(1)},${(H - 2 - (v / max) * (H - 4)).toFixed(1)}`).join("");
+function CategoryTick({ x, y, payload, row, onSelect }: {
+  x: number | string; y: number | string; payload: { value: string }; row?: Row; onSelect?: (row: Row) => void;
+}) {
+  const label = payload.value.length > 16 ? payload.value.slice(0, 15) + "…" : payload.value;
+  const interactive = !!onSelect && !!row;
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="overflow-visible">
-      <path d={d} fill="none" stroke={color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={-116} y={0} dy={4} textAnchor="start" fontSize={13} fontWeight={500}
+        className={cn("fill-night", interactive && "cursor-pointer outline-none hover:fill-electric focus-visible:fill-electric focus-visible:underline")}
+        {...(interactive ? {
+          role: "button", tabIndex: 0, "aria-label": `${payload.value}: ${row!.value}`,
+          onClick: () => onSelect!(row!),
+          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect!(row!); } },
+        } : {})}
+      >
+        <title>{payload.value}</title>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+/** Vertical single-series columns (shadcn "Bar Chart - Label"). */
+export function ColumnChart({ rows, color = SERIES_COLORS[0], height = 240, format = num, onSelect }: {
+  rows: Row[]; color?: string; height?: number; format?: (v: number) => string; onSelect?: (row: Row) => void;
+}) {
+  if (rows.length === 0) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
+  const config: ChartConfig = { value: { label: "Count", color } };
+  return (
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height }}>
+      <BarChart data={rows} margin={{ top: 22, left: 4, right: 4 }} accessibilityLayer>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} interval={0} fontSize={11} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent hideIndicator formatter={(value, _n, item) => (
+          <span className="flex w-full justify-between gap-4"><span className="text-slate-text">{String(item.payload?.label)}</span><span className="font-bold tabular">{format(Number(value))}</span></span>
+        )} />} />
+        <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} maxBarSize={44} minPointSize={2}
+          className={onSelect ? "cursor-pointer" : undefined}
+          onClick={onSelect ? (_: unknown, index: number) => onSelect(rows[index]) : undefined}>
+          <LabelList dataKey="value" position="top" offset={8} className="fill-night font-semibold" fontSize={12} formatter={(v: unknown) => format(Number(v))} />
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+/**
+ * Two measures per category as side-by-side horizontal bars (shadcn "Bar Chart - Multiple").
+ * Both measures share one axis, so they must be counts of the same kind.
+ */
+export function GroupedBars({ rows, series, height }: {
+  rows: { label: string; [key: string]: string | number }[];
+  series: { key: string; label: string }[];
+  height?: number;
+}) {
+  if (rows.length === 0) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
+  const config: ChartConfig = Object.fromEntries(series.map((s, i) => [s.key, { label: s.label, color: SERIES_COLORS[i] }]));
+  return (
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height || rows.length * 54 + 48 }}>
+      <BarChart data={rows} layout="vertical" margin={{ left: 0, right: 40 }} barGap={2} barCategoryGap={10} accessibilityLayer>
+        <XAxis type="number" hide />
+        <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} width={124} interval={0}
+          tickFormatter={(v: string) => (v.length > 17 ? v.slice(0, 16) + "…" : v)} fontSize={12} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+        {series.map((s) => (
+          <Bar key={s.key} dataKey={s.key} fill={`var(--color-${s.key})`} radius={[0, 4, 4, 0]} maxBarSize={16} minPointSize={2}>
+            <LabelList dataKey={s.key} position="right" offset={6} className="fill-night" fontSize={11} formatter={(v: unknown) => num(Number(v))} />
+          </Bar>
+        ))}
+        <ChartLegend content={<ChartLegendContent />} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+/** Part-to-whole donut (shadcn "Pie Chart - Donut with Text"), with a value legend beside it. */
+export function DonutChart({ rows, centerLabel = "Total", format = num }: { rows: Row[]; centerLabel?: string; format?: (v: number) => string }) {
+  const sorted = [...rows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+  const shown = sorted.length > 4 ? [...sorted.slice(0, 3), { label: "Other", value: sorted.slice(3).reduce((s, r) => s + r.value, 0), key: "other" }] : sorted;
+  const total = shown.reduce((s, r) => s + r.value, 0);
+  const slices = shown.map((r, i) => ({ ...r, slot: `d${i}`, fill: r.label === "Other" || i > 2 ? OTHER_COLOR : SERIES_COLORS[i] }));
+  const config: ChartConfig = Object.fromEntries(slices.map((s) => [s.slot, { label: s.label, color: s.fill }]));
+
+  if (!total) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
+
+  return (
+    // Legend sits under the ring so full category names fit even in a narrow card.
+    <div className="flex flex-col items-center gap-4">
+      <ChartContainer config={config} className="aspect-square w-full max-w-[180px] shrink-0">
+        <PieChart accessibilityLayer>
+          <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel nameKey="slot" />} />
+          <Pie data={slices} dataKey="value" nameKey="slot" innerRadius="62%" outerRadius="96%" paddingAngle={slices.length > 1 ? 2 : 0} cornerRadius={4} stroke="#fff" strokeWidth={2}>
+            {slices.map((s) => <Cell key={s.slot} fill={s.fill} />)}
+            <Label content={({ viewBox }) => {
+              if (!viewBox || !("cx" in viewBox)) return null;
+              return (
+                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                  <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 6} className="fill-night text-xl font-extrabold">{format(total)}</tspan>
+                  <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 14} className="fill-slate-text text-[11px]">{centerLabel}</tspan>
+                </text>
+              );
+            }} />
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+      <ul className="w-full min-w-0 space-y-2 text-sm">
+        {slices.map((s) => (
+          <li key={s.slot} className="flex items-center gap-2">
+            <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: s.fill }} aria-hidden />
+            <span className="min-w-0 grow truncate text-slate-text">{s.label}</span>
+            <span className="font-bold tabular">{format(s.value)}</span>
+            <span className="w-10 text-right text-xs text-slate-text tabular">{Math.round((s.value / total) * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** One headline ratio as a radial gauge (shadcn "Radial Chart - Text"). `value` is a percentage. */
+export function RadialGauge({ value, label, color = SERIES_COLORS[0] }: { value: number; label: string; color?: string }) {
+  const pct = Math.max(0, Math.min(100, value));
+  const config: ChartConfig = { value: { label, color } };
+  return (
+    <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-[200px]">
+      <RadialBarChart data={[{ value: pct, fill: "var(--color-value)" }]} startAngle={90} endAngle={90 - 360 * (pct / 100)} innerRadius="74%" outerRadius="100%">
+        <PolarGrid gridType="circle" radialLines={false} stroke="none" className="first:fill-muted last:fill-white" polarRadius={[86, 74]} />
+        <RadialBar dataKey="value" background cornerRadius={10} />
+        <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+          <Label content={({ viewBox }) => {
+            if (!viewBox || !("cx" in viewBox)) return null;
+            return (
+              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 4} className="fill-night text-2xl font-extrabold">{pct.toFixed(pct < 10 && pct > 0 ? 1 : 0)}%</tspan>
+                <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 18} className="fill-slate-text text-[11px]">{label}</tspan>
+              </text>
+            );
+          }} />
+        </PolarRadiusAxis>
+      </RadialBarChart>
+    </ChartContainer>
+  );
+}
+
+/** A cyclical profile such as activity by weekday (shadcn "Radar Chart - Dots"). */
+export function RadarProfile({ rows, series }: { rows: { label: string; [key: string]: string | number }[]; series: { key: string; label: string }[] }) {
+  const config: ChartConfig = Object.fromEntries(series.map((s, i) => [s.key, { label: s.label, color: SERIES_COLORS[i] }]));
+  if (!rows.some((r) => series.some((s) => Number(r[s.key]) > 0))) return <p className="py-6 text-sm text-muted-foreground">Nothing to show yet.</p>;
+  return (
+    <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-[280px]">
+      <RadarChart data={rows} outerRadius="72%">
+        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+        <PolarAngleAxis dataKey="label" tick={{ fontSize: 12, fill: "#475569" }} />
+        <PolarGrid />
+        {series.map((s, i) => (
+          <Radar key={s.key} dataKey={s.key} fill={`var(--color-${s.key})`} fillOpacity={i === 0 ? 0.22 : 0.12} stroke={`var(--color-${s.key})`} strokeWidth={2}
+            dot={{ r: 3, fillOpacity: 1 }} />
+        ))}
+        {series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
+      </RadarChart>
+    </ChartContainer>
+  );
+}
+
+/** Tiny trend for a stat tile. Decorative: the tile states the number. */
+export function Sparkline({ values, color = SERIES_COLORS[0], width = 96, height = 32 }: { values: number[]; color?: string; width?: number; height?: number }) {
+  const gradient = useId().replace(/:/g, "");
+  if (values.length < 2) return null;
+  const data = values.map((v, i) => ({ i, v }));
+  return (
+    <div aria-hidden style={{ width, height }} className="shrink-0">
+      <AreaChart width={width} height={height} data={data} margin={{ top: 2, right: 1, bottom: 2, left: 1 }}>
+        <defs>
+          <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <YAxis hide domain={[0, "dataMax"]} />
+        <Area dataKey="v" type="monotone" stroke={color} strokeWidth={1.75} fill={`url(#${gradient})`} isAnimationActive={false} dot={false} />
+      </AreaChart>
+    </div>
   );
 }

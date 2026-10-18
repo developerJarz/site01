@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
 import { requireAdmin } from "@/lib/admin-auth";
+import { deleteListingsCascade } from "@/lib/cleanup";
 import { escapeRegex, listingImageUrl } from "@/lib/utils";
+import { signDocumentUrl } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,7 @@ const SORTS: Record<string, Record<string, 1 | -1>> = {
 //   ?page=1&limit=20&status=pending&q=corolla&papers=awaiting|verified|none&featured=1&sort=newest
 // GET ?id=<listingId>&docs=1 — the private paper scans for one listing (loaded only when inspecting).
 export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("listings.manage", "papers.verify");
   if (!auth.ok) return auth.response;
 
   try {
@@ -32,11 +34,14 @@ export async function GET(req: NextRequest) {
       if (!mongoose.isValidObjectId(id)) {
         return NextResponse.json({ error: "Invalid listing ID" }, { status: 400 });
       }
-      const listing = await Listing.findById(id).select("documents images").lean();
+      const listing = await Listing.findById(id).select("documents images imageAlts").lean();
       if (!listing) return NextResponse.json({ error: "Listing not found" }, { status: 404 });
       return NextResponse.json({
-        documents: listing.documents || [],
-        images: sp.get("docs") ? undefined : listing.images || [],
+        imageAlts: listing.imageAlts || [],
+        // Private Cloudinary scans need a freshly signed link to open.
+        documents: (listing.documents || []).map(signDocumentUrl),
+        // Served URLs, not raw values: older photos may be megabytes of base64.
+        images: sp.get("docs") ? undefined : (listing.images || []).map((src, i) => listingImageUrl(listing._id, src, i)),
       });
     }
 
@@ -53,6 +58,9 @@ export async function GET(req: NextRequest) {
       const rx = new RegExp(escapeRegex(q), "i");
       base.$or = [{ title: rx }, { make: rx }, { model: rx }, { location: rx }];
     }
+    // ?seller=<userId> — one person's cars, linked from Admin → Users.
+    const seller = sp.get("seller");
+    if (seller && mongoose.isValidObjectId(seller)) base.sellerId = new mongoose.Types.ObjectId(seller);
     if (sp.get("featured") === "1") base.featured = true;
     if (papers === "verified") base.paperVerified = true;
     if (papers === "awaiting") {
@@ -85,7 +93,7 @@ export async function GET(req: NextRequest) {
             title: 1, slug: 1, description: 1, price: 1, condition: 1, make: 1, model: 1,
             year: 1, mileage: 1, fuelType: 1, transmission: 1, engineSize: 1, color: 1,
             location: 1, views: 1, status: 1, featured: 1, paperVerified: 1,
-            paperVerifiedAt: 1, paperVerificationNote: 1, features: 1, createdAt: 1,
+            paperVerifiedAt: 1, paperVerificationNote: 1, features: 1, createdAt: 1, seoTitle: 1, seoDescription: 1,
             thumb: { $arrayElemAt: ["$images", 0] },
             imageCount: { $size: { $ifNull: ["$images", []] } },
             docCount: { $size: { $ifNull: ["$documents", []] } },
@@ -127,18 +135,25 @@ const EDITABLE_FIELDS = [
   "year", "mileage", "fuelType", "transmission", "engineSize",
   "color", "location", "status", "featured", "images", "features",
   "documents", "paperVerified", "paperVerifiedAt", "paperVerificationNote",
+  "seoTitle", "seoDescription", "imageAlts",
 ];
 
 // Fields that may be changed on many listings at once from the bulk bar.
 const BULK_FIELDS = ["status", "featured", "paperVerified", "paperVerifiedAt"];
+const PAPER_FIELDS = ["paperVerified", "paperVerifiedAt", "paperVerificationNote"];
 
 // PATCH — edit one listing ({ id, ...fields }) or bulk-update ({ ids: [], ...fields }).
 export async function PATCH(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("listings.manage", "papers.verify");
   if (!auth.ok) return auth.response;
 
   try {
     const body = await req.json();
+    // Paper checkers without listings.manage may only touch the verification fields.
+    if (!auth.can("listings.manage")) {
+      const extra = Object.keys(body).filter((k) => !["id", "_id", "ids", ...PAPER_FIELDS].includes(k));
+      if (extra.length) return NextResponse.json({ error: "Your role can only verify car papers." }, { status: 403 });
+    }
     await connectToDatabase();
 
     if (Array.isArray(body.ids)) {
@@ -165,6 +180,11 @@ export async function PATCH(req: NextRequest) {
     const update: Record<string, any> = {};
     for (const field of EDITABLE_FIELDS) {
       if (body[field] !== undefined) update[field] = body[field];
+    }
+    if (update.seoTitle !== undefined) update.seoTitle = String(update.seoTitle ?? "").trim().slice(0, 120);
+    if (update.seoDescription !== undefined) update.seoDescription = String(update.seoDescription ?? "").trim().slice(0, 320);
+    if (update.imageAlts !== undefined) {
+      update.imageAlts = Array.isArray(update.imageAlts) ? update.imageAlts.slice(0, 50).map((a: unknown) => String(a ?? "").trim().slice(0, 200)) : [];
     }
 
     // Only regenerate the slug when the title actually changes, so existing links keep working.
@@ -196,7 +216,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE — { id } or { ids: [] }
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("listings.manage");
   if (!auth.ok) return auth.response;
 
   try {
@@ -208,8 +228,8 @@ export async function DELETE(req: NextRequest) {
     if (targets.length === 0) {
       return NextResponse.json({ error: "No listings selected" }, { status: 400 });
     }
-    const result = await Listing.deleteMany({ _id: { $in: targets } });
-    return NextResponse.json({ success: true, deleted: result.deletedCount });
+    const deleted = await deleteListingsCascade(targets);
+    return NextResponse.json({ success: true, deleted });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

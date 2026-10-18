@@ -193,10 +193,9 @@ export async function GET() {
   if (process.env.ALLOW_SEED !== "true") {
     return NextResponse.json({ error: "Seeding is disabled. Set ALLOW_SEED=true to enable it." }, { status: 404 });
   }
-  if (process.env.NODE_ENV === "production") {
-    const auth = await requireAdmin();
-    if (!auth.ok) return auth.response;
-  }
+  // Always admin-only: a local .env can point at the live database.
+  const auth = await requireAdmin("blogs.manage");
+  if (!auth.ok) return auth.response;
   try {
     await connectToDatabase();
     await Blog.deleteMany({});

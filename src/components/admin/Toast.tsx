@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             role={t.tone === "error" ? "alert" : "status"}
-            className="animate-in pointer-events-auto flex w-full items-start gap-3 rounded-xl bg-ink-deep px-4 py-3 text-[15px] text-white shadow-pop"
+            className="animate-in pointer-events-auto flex w-full items-start gap-3 rounded-2xl bg-night px-4 py-3 text-[15px] text-white shadow-pop"
           >
             {t.tone === "success" ? (
               <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-[#6ee7b0]" aria-hidden />
@@ -64,7 +64,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   t.action?.onClick();
                   dismiss(t.id);
                 }}
-                className="shrink-0 font-semibold text-teal-soft hover:underline"
+                className="shrink-0 font-semibold text-[#8ab8ff] hover:underline"
               >
                 {t.action.label}
               </button>

@@ -1,46 +1,17 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, SlidersHorizontal, X, ShieldCheck } from "lucide-react";
+import { Loader2, Search, SearchX, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import { CarCard, CarCardSkeleton, type CarCardData } from "@/components/CarCard";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CONTAINER, EmptyState, PageHero } from "@/components/ui/page";
+import { BRANDS, BUDGETS, CATEGORIES, CONDITIONS, FUELS, MORE_MAKES, TRANSMISSIONS } from "@/components/home/data";
 import { cn, formatLakh } from "@/lib/utils";
 
-const MAKES = [
-  "Audi", "BMW", "Honda", "Hyundai", "Kia", "Lexus", "Mazda", "Mercedes-Benz",
-  "Mitsubishi", "Nissan", "Suzuki", "Toyota", "Volkswagen",
-];
-
-const CONDITIONS = [
-  { value: "", label: "Any" },
-  { value: "new", label: "New" },
-  { value: "used", label: "Used" },
-  { value: "reconditioned", label: "Recon" },
-];
-
-const FUELS = [
-  { value: "petrol", label: "Petrol" },
-  { value: "octane", label: "Octane" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "diesel", label: "Diesel" },
-  { value: "cng", label: "CNG" },
-  { value: "electric", label: "Electric" },
-];
-
-const TRANSMISSIONS = [
-  { value: "", label: "Any" },
-  { value: "automatic", label: "Automatic" },
-  { value: "manual", label: "Manual" },
-];
-
-const BUDGETS = [
-  { label: "Under 10 lakh", min: "", max: "1000000" },
-  { label: "10–20 lakh", min: "1000000", max: "2000000" },
-  { label: "20–40 lakh", min: "2000000", max: "4000000" },
-  { label: "40 lakh–1 crore", min: "4000000", max: "10000000" },
-  { label: "1 crore+", min: "10000000", max: "" },
-];
+const MAKES = [...new Set([...BRANDS.map((b) => b.name), ...MORE_MAKES])].sort((a, b) => a.localeCompare(b));
+const YEARS = Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear() + 1 - i));
 
 const SORTS = [
   { value: "newest", label: "Newest first" },
@@ -51,7 +22,9 @@ const SORTS = [
   { value: "popular", label: "Most viewed" },
 ];
 
-const FILTER_KEYS = ["q", "make", "condition", "fuelType", "transmission", "minPrice", "maxPrice", "location", "verified"] as const;
+const FILTER_KEYS = ["q", "make", "model", "year", "category", "condition", "fuelType", "transmission", "minPrice", "maxPrice", "location", "verified", "seller"] as const;
+
+type SearchResponse = { listings: CarCardData[]; total: number; page: number; pages: number };
 
 export default function CarsPage() {
   return (
@@ -66,8 +39,12 @@ function CarsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<CarCardData[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -88,36 +65,56 @@ function CarsContent() {
     [pathname, router, searchParams]
   );
 
+  const fetchPage = useCallback(async (n: number, signal?: AbortSignal) => {
+    const res = await fetch(`/api/listings/search?${queryString}${queryString ? "&" : ""}page=${n}`, { signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Couldn't load cars.");
+    return data as SearchResponse;
+  }, [queryString]);
+
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setError(false);
-    fetch(`/api/listings/search?${queryString}`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
+    setError("");
+    fetchPage(1, controller.signal)
+      .then((data) => {
+        setListings(data.listings || []);
+        setTotal(data.total || 0);
+        setPage(1);
+        setPages(data.pages || 1);
       })
-      .then((data) => setListings(data.listings || []))
       .catch((e) => {
-        if (e.name !== "AbortError") setError(true);
+        if (e.name !== "AbortError") setError(e.message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [queryString, attempt]);
+  }, [fetchPage, attempt]);
 
-  useEffect(() => {
-    document.body.style.overflow = sheetOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [sheetOpen]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await fetchPage(page + 1);
+      setListings((cars) => [...cars, ...data.listings.filter((c) => !cars.some((x) => x._id === c._id))]);
+      setPage(data.page);
+      setPages(data.pages);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const sellerName = get("seller") ? listings[0]?.seller?.dealershipName || listings[0]?.seller?.name : undefined;
 
   const activeChips = useMemo(() => {
     const chips: { key: string; label: string; clear: Record<string, string> }[] = [];
     if (get("q")) chips.push({ key: "q", label: `“${get("q")}”`, clear: { q: "" } });
+    if (get("category")) chips.push({ key: "category", label: CATEGORIES.find((c) => c.key === get("category"))?.label || get("category"), clear: { category: "" } });
     if (get("make")) chips.push({ key: "make", label: get("make"), clear: { make: "" } });
+    if (get("model")) chips.push({ key: "model", label: get("model"), clear: { model: "" } });
+    if (get("year")) chips.push({ key: "year", label: get("year"), clear: { year: "" } });
     if (get("condition")) chips.push({ key: "condition", label: CONDITIONS.find((c) => c.value === get("condition"))?.label || get("condition"), clear: { condition: "" } });
     if (get("fuelType")) chips.push({ key: "fuelType", label: FUELS.find((f) => f.value === get("fuelType"))?.label || get("fuelType"), clear: { fuelType: "" } });
     if (get("transmission")) chips.push({ key: "transmission", label: TRANSMISSIONS.find((t) => t.value === get("transmission"))?.label || get("transmission"), clear: { transmission: "" } });
@@ -128,8 +125,9 @@ function CarsContent() {
     }
     if (get("location")) chips.push({ key: "location", label: get("location"), clear: { location: "" } });
     if (get("verified") === "1") chips.push({ key: "verified", label: "Paper Verified", clear: { verified: "" } });
+    if (get("seller")) chips.push({ key: "seller", label: sellerName ? `Sold by ${sellerName}` : "One seller", clear: { seller: "" } });
     return chips;
-  }, [get]);
+  }, [get, sellerName]);
 
   const clearAll = () => {
     const reset: Record<string, string> = {};
@@ -137,134 +135,143 @@ function CarsContent() {
     setParams(reset);
   };
 
-  const heading = get("make") ? `${get("make")} cars for sale` : get("verified") === "1" ? "Cars with checked papers" : "Cars for sale";
+  const category = CATEGORIES.find((c) => c.key === get("category"));
+  const heading = sellerName
+    ? `Cars from ${sellerName}`
+    : get("make")
+    ? `${get("make")} cars for sale`
+    : category
+      ? `${category.label} cars for sale`
+      : get("verified") === "1"
+        ? "Paper Verified cars"
+        : "Cars for sale in Bangladesh";
+  const countLabel = `${total.toLocaleString("en-IN")} ${total === 1 ? "car" : "cars"}`;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-      <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-        <ol className="flex items-center gap-2">
-          <li><Link href="/" className="hover:text-primary">Home</Link></li>
-          <li aria-hidden>/</li>
-          <li aria-current="page" className="font-medium text-foreground">Cars</li>
-        </ol>
-      </nav>
-
-      <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-semiwide text-3xl font-extrabold md:text-4xl">{heading}</h1>
-          <p className="mt-1 text-muted-foreground" aria-live="polite">
-            {loading ? "Finding cars…" : `${listings.length.toLocaleString("en-IN")} ${listings.length === 1 ? "car" : "cars"}${listings.length >= 120 ? "+" : ""}`}
-          </p>
+    <>
+      <PageHero
+        eyebrow="Buy a car"
+        title={heading}
+        breadcrumbs={[{ label: "Home", href: "/" }, { label: "Cars" }]}
+        description={<p aria-live="polite">{loading ? "Finding cars…" : `${countLabel} from verified dealers and owners, updated every day.`}</p>}
+      >
+        <div className="mt-8 grid gap-3 rounded-3xl border border-white/70 bg-white/80 p-3 shadow-float backdrop-blur-xl sm:grid-cols-[minmax(0,1fr)_14rem]">
+          <div className="relative">
+            <label htmlFor="cars-q" className="sr-only">Search cars</label>
+            <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-text" aria-hidden />
+            <DebouncedInput id="cars-q" type="search" value={get("q")} onCommit={(v) => setParams({ q: v.trim() })}
+              placeholder="Search Axio, Premio, Harrier, Dhaka…" className="search-input pl-11" />
+          </div>
+          <div>
+            <label className="sr-only" htmlFor="sort">Sort by</label>
+            <select id="sort" value={get("sort") || "newest"} onChange={(e) => setParams({ sort: e.target.value === "newest" ? "" : e.target.value })} className="search-input">
+              {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setSheetOpen(true)}
-            className="inline-flex grow items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2.5 text-sm font-semibold lg:hidden"
-          >
-            <SlidersHorizontal size={16} aria-hidden /> Filters
-            {activeChips.length > 0 && (
-              <span className="rounded-full bg-primary px-1.5 text-xs font-bold text-white tabular">{activeChips.length}</span>
-            )}
-          </button>
-          <label className="sr-only" htmlFor="sort">Sort by</label>
-          <select
-            id="sort"
-            value={get("sort") || "newest"}
-            onChange={(e) => setParams({ sort: e.target.value === "newest" ? "" : e.target.value })}
-            className="grow rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-semibold sm:grow-0"
-          >
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      </PageHero>
 
-      {activeChips.length > 0 && (
+      <div className={cn(CONTAINER, "pb-20 pt-6")}>
+        {/* Category rail */}
+        <ul className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Car type">
+          <li>
+            <CategoryChip active={!get("category")} onClick={() => setParams({ category: "" })}>All cars</CategoryChip>
+          </li>
+          {CATEGORIES.map((c) => (
+            <li key={c.key}>
+              <CategoryChip active={get("category") === c.key} onClick={() => setParams({ category: get("category") === c.key ? "" : c.key })}>{c.label}</CategoryChip>
+            </li>
+          ))}
+        </ul>
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => setSheetOpen(true)} className="lg:hidden">
+            <SlidersHorizontal size={16} aria-hidden /> Filters
+            {activeChips.length > 0 && <span className="rounded-full bg-electric px-1.5 text-xs font-bold text-white tabular">{activeChips.length}</span>}
+          </Button>
           {activeChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => setParams(chip.clear)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#bcd0ee] bg-[#e6eefa] py-1 pl-3 pr-2 text-sm font-medium text-primary hover:border-primary"
-              aria-label={`Remove filter ${chip.label}`}
-            >
+            <button key={chip.key} type="button" onClick={() => setParams(chip.clear)} aria-label={`Remove filter ${chip.label}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-electric/20 bg-haze pl-3.5 pr-2.5 text-sm font-semibold text-electric-deep transition-colors hover:border-electric">
               {chip.label} <X size={14} aria-hidden />
             </button>
           ))}
-          <button type="button" onClick={clearAll} className="px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
-            Clear all
-          </button>
-        </div>
-      )}
-
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[17rem_minmax(0,1fr)]">
-        <aside className="hidden lg:block" aria-label="Filters">
-          <div className="sticky top-20 rounded-xl border border-border bg-card p-5">
-            <Filters get={get} setParams={setParams} />
-          </div>
-        </aside>
-
-        <section aria-label="Results">
-          {error ? (
-            <div className="rounded-xl border border-border bg-card p-10 text-center">
-              <p className="font-semibold">Couldn&apos;t load cars.</p>
-              <p className="mt-1 text-muted-foreground">Check your connection and try again.</p>
-              <button onClick={() => setAttempt((n) => n + 1)} className="mt-4 rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">
-                Try again
-              </button>
-            </div>
-          ) : loading && listings.length === 0 ? (
-            <ResultsGrid>
-              {Array.from({ length: 6 }).map((_, i) => <CarCardSkeleton key={i} />)}
-            </ResultsGrid>
-          ) : listings.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-input bg-card p-10 text-center">
-              <p className="text-lg font-semibold">No cars match these filters</p>
-              <p className="mx-auto mt-1 max-w-md text-muted-foreground">
-                Remove a filter or widen your budget. New cars are listed every day.
-              </p>
-              <button onClick={clearAll} className="mt-5 rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">
-                Clear all filters
-              </button>
-            </div>
-          ) : (
-            <ResultsGrid className={cn("transition-opacity duration-150", loading && "opacity-60")}>
-              {listings.map((car, i) => (
-                <CarCard key={car._id} car={car} priority={i < 3} sizes="(min-width: 1280px) 19rem, (min-width: 640px) 45vw, 92vw" />
-              ))}
-            </ResultsGrid>
+          {activeChips.length > 0 && (
+            <button type="button" onClick={clearAll} className="h-9 px-2 text-sm font-semibold text-slate-text hover:text-night">Clear all</button>
           )}
-        </section>
-      </div>
+        </div>
 
-      {sheetOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="Filters">
-          <div className="animate-fade absolute inset-0 bg-ink-deep/60" onClick={() => setSheetOpen(false)} />
-          <div className="animate-sheet-up absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl bg-card shadow-pop">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-lg font-bold">Filters</h2>
-              <button onClick={() => setSheetOpen(false)} className="rounded-lg p-2 hover:bg-muted" aria-label="Close filters">
-                <X size={22} />
-              </button>
-            </div>
-            <div className="overflow-y-auto px-5 py-5">
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="hidden lg:block" aria-label="Filters">
+            <div className="sticky top-24 max-h-[calc(100dvh-112px)] overflow-y-auto rounded-3xl border border-hairline bg-white p-6 shadow-soft">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-base font-bold">Filters</h2>
+                {activeChips.length > 0 && <button type="button" onClick={clearAll} className="text-sm font-semibold text-electric hover:underline">Reset</button>}
+              </div>
               <Filters get={get} setParams={setParams} />
             </div>
-            <div className="flex gap-3 border-t border-border p-4">
-              <button onClick={clearAll} className="rounded-lg border border-border px-5 py-3 font-semibold">
-                Clear
-              </button>
-              <button onClick={() => setSheetOpen(false)} className="grow rounded-lg bg-primary py-3 font-semibold text-white">
-                {loading ? "Show cars" : `Show ${listings.length} ${listings.length === 1 ? "car" : "cars"}`}
-              </button>
-            </div>
-          </div>
+          </aside>
+
+          <section aria-label="Results">
+            {error && listings.length === 0 ? (
+              <EmptyState icon={SearchX} title="Couldn't load cars" body={error}
+                action={<Button onClick={() => setAttempt((n) => n + 1)}>Try again</Button>} />
+            ) : loading && listings.length === 0 ? (
+              <ResultsGrid>{Array.from({ length: 6 }).map((_, i) => <CarCardSkeleton key={i} />)}</ResultsGrid>
+            ) : listings.length === 0 ? (
+              <EmptyState icon={SearchX} title="No cars match these filters"
+                body="Remove a filter or widen your budget. New cars are listed every day."
+                action={<Button onClick={clearAll}>Clear all filters</Button>} />
+            ) : (
+              <>
+                <ResultsGrid className={cn("transition-opacity duration-150", loading && "opacity-60")}>
+                  {listings.map((car, i) => (
+                    <CarCard key={car._id} car={car} priority={i < 3} sizes="(min-width: 1280px) 19rem, (min-width: 640px) 45vw, 92vw" />
+                  ))}
+                </ResultsGrid>
+                <div className="mt-10 flex flex-col items-center gap-3">
+                  <p className="text-sm text-slate-text tabular">Showing {listings.length.toLocaleString("en-IN")} of {countLabel}</p>
+                  {page < pages && (
+                    <Button variant="secondary" size="lg" onClick={loadMore} disabled={loadingMore}>
+                      {loadingMore && <Loader2 size={16} className="animate-spin" aria-hidden />}
+                      {loadingMore ? "Loading…" : "Load more cars"}
+                    </Button>
+                  )}
+                  {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+                </div>
+              </>
+            )}
+          </section>
         </div>
-      )}
-    </div>
+      </div>
+
+      <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DialogContent side="bottom">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+            <DialogDescription>Narrow down by budget, make, fuel and more.</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto px-6 py-5">
+            <Filters get={get} setParams={setParams} />
+          </div>
+          <div className="flex gap-3 border-t border-hairline p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <Button variant="secondary" onClick={clearAll}>Clear</Button>
+            <Button className="grow" onClick={() => setSheetOpen(false)}>
+              {loading ? "Show cars" : `Show ${countLabel}`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function CategoryChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" aria-pressed={active} onClick={onClick}
+      className={cn("h-10 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors",
+        active ? "border-night bg-night text-white" : "border-hairline bg-white text-slate-text hover:border-electric/40 hover:text-night")}>
+      {children}
+    </button>
   );
 }
 
@@ -274,8 +281,8 @@ function ResultsGrid({ children, className }: { children: React.ReactNode; class
 
 function ResultsSkeleton() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="skeleton h-9 w-64 rounded" />
+    <div className={cn(CONTAINER, "py-16")}>
+      <div className="skeleton h-10 w-72 rounded-xl" />
       <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => <CarCardSkeleton key={i} />)}
       </div>
@@ -291,6 +298,10 @@ function DebouncedInput({
 }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
   const [draft, setDraft] = useState(value);
   const committed = useRef(value);
+  const commit = useRef(onCommit);
+  useEffect(() => {
+    commit.current = onCommit;
+  });
 
   useEffect(() => {
     if (value !== committed.current) {
@@ -303,67 +314,42 @@ function DebouncedInput({
     if (draft === committed.current) return;
     const t = setTimeout(() => {
       committed.current = draft;
-      onCommit(draft);
+      commit.current(draft);
     }, 400);
     return () => clearTimeout(t);
-  }, [draft, onCommit]);
+  }, [draft]);
 
   return <input {...props} value={draft} onChange={(e) => setDraft(e.target.value)} />;
 }
 
-const fieldClass =
-  "w-full rounded-lg border border-input bg-card px-3 py-2.5 text-[15px] placeholder:text-muted-foreground";
-
 function Filters({ get, setParams }: { get: (k: string) => string; setParams: (u: Record<string, string>) => void }) {
-  const commitQ = useCallback((v: string) => setParams({ q: v.trim() }), [setParams]);
-  const commitLocation = useCallback((v: string) => setParams({ location: v.trim() }), [setParams]);
-  const commitMin = useCallback((v: string) => setParams({ minPrice: v ? String(Math.round(Number(v) * 100000)) : "" }), [setParams]);
-  const commitMax = useCallback((v: string) => setParams({ maxPrice: v ? String(Math.round(Number(v) * 100000)) : "" }), [setParams]);
   const toLakh = (v: string) => (v ? String(Number(v) / 100000) : "");
+  const fromLakh = (v: string) => (v ? String(Math.round(Number(v) * 100000)) : "");
+  const verified = get("verified") === "1";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <label htmlFor="f-q" className="mb-2 block text-sm font-semibold">Keyword</label>
-        <div className="relative">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <DebouncedInput id="f-q" type="search" value={get("q")} onCommit={commitQ} placeholder="Axio, Premio, Noah…" className={cn(fieldClass, "pl-9")} />
-        </div>
-      </div>
-
-      <button
-        type="button"
-        role="switch"
-        aria-checked={get("verified") === "1"}
-        onClick={() => setParams({ verified: get("verified") === "1" ? "" : "1" })}
-        className={cn(
-          "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-          get("verified") === "1" ? "border-verified bg-[#e3f5ec]" : "border-border hover:bg-muted"
-        )}
-      >
+    <div className="space-y-7">
+      <button type="button" role="switch" aria-checked={verified} onClick={() => setParams({ verified: verified ? "" : "1" })}
+        className={cn("flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-colors",
+          verified ? "border-verified/40 bg-verified-soft" : "border-hairline hover:bg-mist")}>
         <ShieldCheck size={20} className="shrink-0 text-verified" aria-hidden />
         <span className="grow text-sm font-semibold">Paper Verified only</span>
-        <span className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", get("verified") === "1" ? "bg-verified" : "bg-input")}>
-          <span className={cn("absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform", get("verified") === "1" && "translate-x-4")} />
+        <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition-colors", verified ? "bg-verified" : "bg-[#cbd5e1]")}>
+          <span className={cn("absolute left-1 top-1 size-4 rounded-full bg-white shadow transition-transform", verified && "translate-x-4")} />
         </span>
       </button>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold">Budget</legend>
+        <legend className="field-label">Budget</legend>
         <div className="flex flex-wrap gap-1.5">
           {BUDGETS.map((b) => {
-            const on = get("minPrice") === b.min && get("maxPrice") === b.max;
+            const [min, max] = b.value.split("-");
+            const on = get("minPrice") === (min === "0" ? "" : min) && get("maxPrice") === max;
             return (
-              <button
-                key={b.label}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setParams(on ? { minPrice: "", maxPrice: "" } : { minPrice: b.min, maxPrice: b.max })}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                  on ? "border-primary bg-primary text-white" : "border-border hover:border-primary"
-                )}
-              >
+              <button key={b.value} type="button" aria-pressed={on}
+                onClick={() => setParams(on ? { minPrice: "", maxPrice: "" } : { minPrice: min === "0" ? "" : min, maxPrice: max })}
+                className={cn("h-9 rounded-full border px-3 text-[13px] font-semibold transition-colors",
+                  on ? "border-electric bg-electric text-white" : "border-hairline text-slate-text hover:border-electric/40 hover:text-night")}>
                 {b.label}
               </button>
             );
@@ -371,40 +357,47 @@ function Filters({ get, setParams }: { get: (k: string) => string; setParams: (u
         </div>
         <div className="mt-3 flex items-center gap-2">
           <label className="sr-only" htmlFor="f-min">Minimum price in lakh</label>
-          <DebouncedInput id="f-min" type="number" inputMode="decimal" min={0} value={toLakh(get("minPrice"))} onCommit={commitMin} placeholder="Min" className={fieldClass} />
-          <span className="text-muted-foreground" aria-hidden>–</span>
+          <DebouncedInput id="f-min" type="number" inputMode="decimal" min={0} value={toLakh(get("minPrice"))} onCommit={(v) => setParams({ minPrice: fromLakh(v) })} placeholder="Min" className="field h-11" />
+          <span className="text-slate-text" aria-hidden>–</span>
           <label className="sr-only" htmlFor="f-max">Maximum price in lakh</label>
-          <DebouncedInput id="f-max" type="number" inputMode="decimal" min={0} value={toLakh(get("maxPrice"))} onCommit={commitMax} placeholder="Max" className={fieldClass} />
-          <span className="shrink-0 text-sm text-muted-foreground">lakh</span>
+          <DebouncedInput id="f-max" type="number" inputMode="decimal" min={0} value={toLakh(get("maxPrice"))} onCommit={(v) => setParams({ maxPrice: fromLakh(v) })} placeholder="Max" className="field h-11" />
+          <span className="shrink-0 text-sm text-slate-text">lakh</span>
         </div>
       </fieldset>
 
-      <div>
-        <label htmlFor="f-make" className="mb-2 block text-sm font-semibold">Make</label>
-        <select id="f-make" value={get("make")} onChange={(e) => setParams({ make: e.target.value })} className={fieldClass}>
-          <option value="">All makes</option>
-          {MAKES.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label htmlFor="f-make" className="field-label">Make</label>
+          <select id="f-make" value={get("make")} onChange={(e) => setParams({ make: e.target.value, model: "" })} className="field">
+            <option value="">All makes</option>
+            {MAKES.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="f-model" className="field-label">Model</label>
+          <DebouncedInput id="f-model" type="text" value={get("model")} onCommit={(v) => setParams({ model: v.trim() })} placeholder="Any" className="field" />
+        </div>
+        <div>
+          <label htmlFor="f-year" className="field-label">Year</label>
+          <select id="f-year" value={get("year")} onChange={(e) => setParams({ year: e.target.value })} className="field">
+            <option value="">Any</option>
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
 
-      <Segmented legend="Condition" options={CONDITIONS} value={get("condition")} onChange={(v) => setParams({ condition: v })} />
+      <Segmented legend="Condition" options={[{ value: "", label: "Any" }, ...CONDITIONS.map((c) => ({ ...c, label: c.value === "reconditioned" ? "Recon" : c.label }))]}
+        value={get("condition")} onChange={(v) => setParams({ condition: v })} />
 
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold">Fuel</legend>
+        <legend className="field-label">Fuel</legend>
         <div className="grid grid-cols-3 gap-1.5">
           {FUELS.map((f) => {
             const on = get("fuelType") === f.value;
             return (
-              <button
-                key={f.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setParams({ fuelType: on ? "" : f.value })}
-                className={cn(
-                  "rounded-lg border py-2 text-sm font-medium transition-colors",
-                  on ? "border-primary bg-primary text-white" : "border-border hover:border-primary"
-                )}
-              >
+              <button key={f.value} type="button" aria-pressed={on} onClick={() => setParams({ fuelType: on ? "" : f.value })}
+                className={cn("h-10 rounded-xl border text-[13px] font-semibold transition-colors",
+                  on ? "border-electric bg-electric text-white" : "border-hairline text-slate-text hover:border-electric/40 hover:text-night")}>
                 {f.label}
               </button>
             );
@@ -412,22 +405,18 @@ function Filters({ get, setParams }: { get: (k: string) => string; setParams: (u
         </div>
       </fieldset>
 
-      <Segmented legend="Transmission" options={TRANSMISSIONS} value={get("transmission")} onChange={(v) => setParams({ transmission: v })} />
+      <Segmented legend="Transmission" options={[{ value: "", label: "Any" }, ...TRANSMISSIONS.filter((t) => t.value !== "semi-automatic")]}
+        value={get("transmission")} onChange={(v) => setParams({ transmission: v })} />
 
       <div>
-        <label htmlFor="f-loc" className="mb-2 block text-sm font-semibold">City or area</label>
-        <DebouncedInput id="f-loc" type="text" value={get("location")} onCommit={commitLocation} placeholder="Dhaka, Gulshan, Chattogram…" className={fieldClass} />
+        <label htmlFor="f-loc" className="field-label">City or area</label>
+        <DebouncedInput id="f-loc" type="text" value={get("location")} onCommit={(v) => setParams({ location: v.trim() })} placeholder="Dhaka, Gulshan, Chattogram…" className="field" />
       </div>
     </div>
   );
 }
 
-function Segmented({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
+function Segmented({ legend, options, value, onChange }: {
   legend: string;
   options: { value: string; label: string }[];
   value: string;
@@ -435,19 +424,12 @@ function Segmented({
 }) {
   return (
     <fieldset>
-      <legend className="mb-2 text-sm font-semibold">{legend}</legend>
-      <div className="flex rounded-lg bg-muted p-1">
+      <legend className="field-label">{legend}</legend>
+      <div className="flex rounded-2xl bg-mist p-1">
         {options.map((o) => (
-          <button
-            key={o.value || "any"}
-            type="button"
-            aria-pressed={value === o.value}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "grow rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
-              value === o.value ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
+          <button key={o.value || "any"} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
+            className={cn("h-9 grow rounded-xl px-2 text-[13px] font-semibold transition-colors",
+              value === o.value ? "bg-white text-night shadow-soft" : "text-slate-text hover:text-night")}>
             {o.label}
           </button>
         ))}

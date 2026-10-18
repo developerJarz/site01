@@ -1,242 +1,161 @@
-export const dynamic = "force-dynamic";
-
+import { cache } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ArrowRight, CalendarDays, Eye } from "lucide-react";
 import { connectToDatabase } from "@/lib/db";
 import { Blog } from "@/lib/models/Blog";
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import {
-  Calendar,
-  Eye,
-  ArrowLeft,
-  User as UserIcon,
-  Tag,
-  Share2,
-} from "lucide-react";
+import { BlogCard, type BlogSummary } from "@/components/blog/BlogCard";
+import { CarImage } from "@/components/CarImage";
+import { ShareButton } from "@/components/car/ShareButton";
+import { Button } from "@/components/ui/button";
+import { Breadcrumbs, CONTAINER } from "@/components/ui/page";
+import { cn, escapeRegex } from "@/lib/utils";
+import { absoluteUrl, buildMetadata, splitKeywords } from "@/lib/seo";
+import { shareImageUrl, truncate } from "@/lib/seo-text";
+import { JsonLd, breadcrumbLd } from "@/components/seo/JsonLd";
 
-function escapeRegex(str: string) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const dynamic = "force-dynamic";
+
+const getPost = cache(async (slug: string) => {
+  const decoded = decodeURIComponent(slug || "");
+  await connectToDatabase();
+  return (await Blog.findOne({
+    $or: [{ slug: decoded }, { slug }, { slug: { $regex: new RegExp(`^${escapeRegex(decoded)}$`, "i") } }],
+    published: true,
+  }).lean()) as any;
+});
+
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await props.params;
+  try {
+    const post = await getPost(slug);
+    if (post) {
+      const cover = shareImageUrl(post.coverImage?.startsWith("data:") ? undefined : post.coverImage);
+      return buildMetadata(`/blog/${post.slug}`, {
+        title: post.seoTitle || post.title,
+        useTemplate: !post.seoTitle,
+        socialTitle: post.title,
+        description: truncate(post.seoDescription || post.excerpt || "", 160),
+        keywords: splitKeywords(post.keywords).length ? splitKeywords(post.keywords) : post.tags,
+        images: cover ? [{ url: cover, alt: post.coverAlt || post.title }] : undefined,
+        type: "article",
+        publishedTime: new Date(post.createdAt).toISOString(),
+        modifiedTime: new Date(post.updatedAt || post.createdAt).toISOString(),
+      });
+    }
+  } catch {}
+  return { title: "Blog", robots: { index: false } };
 }
 
-export default async function BlogPostPage(props: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function BlogPostPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
-  const decodedSlug = decodeURIComponent(slug || "");
-  const escaped = escapeRegex(decodedSlug);
-
-  let blog: any = null;
-  let related: any[] = [];
+  let post: any = null;
+  let related: BlogSummary[] = [];
   try {
-    await connectToDatabase();
-    blog = (await Blog.findOne({
-      $or: [
-        { slug: decodedSlug },
-        { slug: slug },
-        { slug: { $regex: new RegExp(`^${escaped}$`, "i") } },
-      ],
-      published: true,
-    }).lean()) as any;
-
-    if (blog) {
-      // Increment view count
-      try { Blog.updateOne({ _id: blog._id }, { $inc: { views: 1 } }).exec(); } catch {}
-
-      // Get related posts
-      related = (await Blog.find({
-        published: true,
-        _id: { $ne: blog._id },
-      })
-        .sort({ createdAt: -1 })
-        .limit(3)
-        .select("title slug coverImage excerpt createdAt tags")
-        .lean()) as any[];
+    post = await getPost(slug);
+    if (post) {
+      Blog.updateOne({ _id: post._id }, { $inc: { views: 1 } }).exec().catch(() => {});
+      const sameTags = post.tags?.length ? { tags: { $in: post.tags } } : {};
+      related = JSON.parse(JSON.stringify(await Blog.find({ published: true, _id: { $ne: post._id }, ...sameTags })
+        .sort({ createdAt: -1 }).limit(3).select("title slug coverImage excerpt createdAt tags").lean()));
     }
   } catch (error) {
     console.error("Failed to fetch blog post:", error);
   }
+  if (!post) notFound();
 
-  if (!blog) {
-    notFound();
-  }
-
-  const formattedDate = new Date(blog.createdAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  // Split content into paragraphs
-  const paragraphs = blog.content
-    .split("\n")
-    .filter((p: string) => p.trim());
+  const published = new Date(post.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const paragraphs: string[] = String(post.content || "").split("\n").map((p) => p.trim()).filter(Boolean);
+  const coverAlt = post.coverAlt || post.title;
+  const postUrl = absoluteUrl(`/blog/${post.slug}`);
+  const jsonLd = [{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    mainEntityOfPage: postUrl,
+    url: postUrl,
+    inLanguage: "en-BD",
+    ...(post.tags?.length ? { keywords: post.tags.join(", ") } : {}),
+    publisher: { "@type": "Organization", name: "CarHat BD", logo: { "@type": "ImageObject", url: absoluteUrl("/car-hat-bd.png") } },
+    headline: post.title,
+    description: post.excerpt,
+    image: post.coverImage && !post.coverImage.startsWith("data:") ? [absoluteUrl(shareImageUrl(post.coverImage)!)] : undefined,
+    datePublished: new Date(post.createdAt).toISOString(),
+    dateModified: new Date(post.updatedAt || post.createdAt).toISOString(),
+    author: { "@type": "Organization", name: post.author || "CarHat Team" },
+  }, breadcrumbLd([
+    { name: "Home", url: absoluteUrl("/") },
+    { name: "Blog", url: absoluteUrl("/blog") },
+    { name: post.title, url: postUrl },
+  ])];
 
   return (
-    <div className="flex flex-col">
-      {/* Hero Cover */}
-      <section className="relative h-[400px] md:h-[500px] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20 z-10" />
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${blog.coverImage})` }}
-        />
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-6 md:p-12">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-2 mb-4">
-              {blog.tags?.map((tag: string) => (
-                <span
-                  key={tag}
-                  className="text-xs bg-white/20 backdrop-blur-sm text-white px-3 py-1 rounded-full font-medium"
-                >
-                  {tag}
-                </span>
+    <article className="bg-white">
+      <JsonLd data={jsonLd} />
+      <header className="hero-backdrop border-b border-hairline">
+        <div className={cn(CONTAINER, "max-w-4xl py-10 md:py-14")}>
+          <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Blog", href: "/blog" }, { label: post.title }]} />
+          {!!post.tags?.length && (
+            <ul className="mt-6 flex flex-wrap gap-1.5">
+              {post.tags.map((t: string) => (
+                <li key={t}><Link href={`/blog?tag=${encodeURIComponent(t)}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold capitalize text-electric-deep shadow-soft hover:text-electric">{t}</Link></li>
               ))}
-            </div>
-            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
-              {blog.title}
-            </h1>
-            <div className="flex flex-wrap items-center gap-4 text-white/80 text-sm">
-              <span className="flex items-center gap-1.5">
-                <UserIcon size={14} /> {blog.author}
+            </ul>
+          )}
+          <h1 className="mt-4 text-[2.1rem] font-extrabold leading-[1.1] text-night md:text-5xl">{post.title}</h1>
+          <p className="mt-4 text-lg leading-relaxed text-slate-text">{post.excerpt}</p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-electric to-electric-light font-bold text-white" aria-hidden>
+                {(post.author || "C")[0].toUpperCase()}
               </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar size={14} /> {formattedDate}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Eye size={14} /> {(blog.views || 0) + 1} views
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Content */}
-      <section className="py-12">
-        <div className="max-w-4xl mx-auto px-4">
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-            <Link href="/" className="hover:text-primary transition-colors">
-              Home
-            </Link>
-            <span>/</span>
-            <Link
-              href="/blog"
-              className="hover:text-primary transition-colors"
-            >
-              Blog
-            </Link>
-            <span>/</span>
-            <span className="text-foreground font-medium truncate">
-              {blog.title}
-            </span>
-          </nav>
-
-          <div className="flex flex-col lg:flex-row gap-10">
-            {/* Main Content */}
-            <article className="flex-grow">
-              <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
-                <p className="text-lg text-muted-foreground font-medium mb-8 leading-relaxed border-l-4 border-primary pl-4 italic">
-                  {blog.excerpt}
+              <div className="text-sm">
+                <p className="font-bold text-night">{post.author || "CarHat Team"}</p>
+                <p className="flex items-center gap-3 text-slate-text">
+                  <span className="inline-flex items-center gap-1"><CalendarDays size={13} aria-hidden /> {published}</span>
+                  <span className="inline-flex items-center gap-1 tabular"><Eye size={13} aria-hidden /> {((post.views || 0) + 1).toLocaleString("en-IN")}</span>
                 </p>
-                <div className="prose prose-lg dark:prose-invert max-w-none space-y-5">
-                  {paragraphs.map((para: string, i: number) => (
-                    <p
-                      key={i}
-                      className="text-muted-foreground leading-relaxed"
-                    >
-                      {para}
-                    </p>
-                  ))}
-                </div>
               </div>
-
-              {/* Tags */}
-              {blog.tags && blog.tags.length > 0 && (
-                <div className="flex items-center gap-2 mt-6 flex-wrap">
-                  <Tag size={16} className="text-muted-foreground" />
-                  {blog.tags.map((tag: string) => (
-                    <span
-                      key={tag}
-                      className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Share */}
-              <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
-                <Share2 size={16} />
-                <span>Share this article</span>
-              </div>
-            </article>
-
-            {/* Sidebar */}
-            <aside className="lg:w-80 flex-shrink-0">
-              <div className="sticky top-24 space-y-6">
-                {/* Author */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="font-bold mb-4">About the Author</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-white font-bold text-lg">
-                      {blog.author[0]}
-                    </div>
-                    <div>
-                      <p className="font-medium">{blog.author}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Automotive Writer
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Related Posts */}
-                {related.length > 0 && (
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <h3 className="font-bold mb-4">Related Posts</h3>
-                    <div className="space-y-4">
-                      {related.map((post: any) => (
-                        <Link
-                          href={`/blog/${post.slug}`}
-                          key={post._id}
-                          className="flex gap-3 group"
-                        >
-                          <div className="w-16 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                            <div
-                              className="w-full h-full bg-cover bg-center"
-                              style={{
-                                backgroundImage: `url(${post.coverImage})`,
-                              }}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
-                              {post.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(
-                                post.createdAt
-                              ).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Back */}
-                <Link
-                  href="/blog"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
-                >
-                  <ArrowLeft size={16} /> Back to all posts
-                </Link>
-              </div>
-            </aside>
+            </div>
+            <ShareButton title={post.title} />
           </div>
         </div>
-      </section>
-    </div>
+      </header>
+
+      {post.coverImage && (
+        <div className={cn(CONTAINER, "max-w-5xl")}>
+          <div className="relative -mt-px aspect-[16/8] overflow-hidden rounded-b-[32px] bg-mist md:mt-8 md:rounded-[32px]">
+            <CarImage src={post.coverImage} alt={coverAlt} sizes="(min-width: 1024px) 1024px, 100vw" priority />
+          </div>
+        </div>
+      )}
+
+      <div className={cn(CONTAINER, "max-w-3xl py-12 md:py-16")}>
+        <div className="prose-car">
+          {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+        </div>
+        <div className="mt-12 flex flex-col items-start gap-4 rounded-3xl border border-hairline bg-gradient-to-br from-mist via-white to-haze p-7 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-lg font-extrabold">Ready to find your car?</p>
+            <p className="text-slate-text">Thousands of checked listings from dealers and owners.</p>
+          </div>
+          <Button asChild size="lg"><Link href="/cars">Browse cars <ArrowRight size={17} aria-hidden /></Link></Button>
+        </div>
+      </div>
+
+      {related.length > 0 && (
+        <section aria-labelledby="related-heading" className="border-t border-hairline bg-mist py-14">
+          <div className={CONTAINER}>
+            <div className="mb-8 flex items-end justify-between gap-4">
+              <h2 id="related-heading" className="text-[1.75rem] font-extrabold">Keep reading</h2>
+              <Link href="/blog" className="inline-flex items-center gap-1 text-sm font-semibold text-electric hover:underline"><ArrowLeft size={15} aria-hidden /> All posts</Link>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {related.map((r) => <BlogCard key={r._id} post={r} />)}
+            </div>
+          </div>
+        </section>
+      )}
+    </article>
   );
 }

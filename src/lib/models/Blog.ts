@@ -8,6 +8,11 @@ export interface IBlog extends Document {
   coverImage: string;
   author: string;
   tags: string[];
+  /** Optional search overrides; empty means the title and excerpt are used. */
+  seoTitle?: string;
+  seoDescription?: string;
+  keywords?: string;
+  coverAlt?: string;
   published: boolean;
   views: number;
   createdAt: Date;
@@ -23,6 +28,10 @@ const BlogSchema: Schema<IBlog> = new Schema(
     coverImage: { type: String, required: true },
     author: { type: String, default: "CarHat Team" },
     tags: [{ type: String }],
+    seoTitle: { type: String, trim: true, maxlength: 120 },
+    seoDescription: { type: String, trim: true, maxlength: 320 },
+    keywords: { type: String, trim: true, maxlength: 500 },
+    coverAlt: { type: String, trim: true, maxlength: 200 },
     published: { type: Boolean, default: true },
     views: { type: Number, default: 0 },
   },

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Conversation } from "@/lib/models/Conversation";
+import { listingImageUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,13 @@ export async function GET() {
     })
       .populate("buyer", "name avatar")
       .populate("seller", "name avatar")
-      .populate("listing", "title slug images price")
+      // Cover photo only: image arrays can hold several MB of base64.
+      .populate({ path: "listing", select: { title: 1, slug: 1, price: 1, status: 1, images: { $slice: 1 } } })
       .sort({ lastMessageAt: -1 })
       .lean();
 
-    const formatted = conversations.map((c: any) => {
+    // A deleted account or listing leaves a dangling reference; skip those threads instead of failing the inbox.
+    const formatted = conversations.filter((c: any) => c.buyer && c.seller && c.listing).map((c: any) => {
       const isBuyer = c.buyer._id.toString() === userId;
       const otherParty = isBuyer ? c.seller : c.buyer;
       const unreadCount = isBuyer ? c.buyerUnread : c.sellerUnread;
@@ -42,8 +45,9 @@ export async function GET() {
           _id: c.listing._id.toString(),
           title: c.listing.title,
           slug: c.listing.slug,
-          image: c.listing.images?.[0] || null,
+          image: listingImageUrl(c.listing._id, c.listing.images?.[0]) || null,
           price: c.listing.price,
+          status: c.listing.status,
         },
         lastMessage: c.lastMessage,
         lastMessageAt: c.lastMessageAt,

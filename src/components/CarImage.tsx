@@ -16,7 +16,7 @@ interface CarImageProps {
 /**
  * Listing photos arrive in three forms:
  *  - /uploads/<file> or /api/listing-image/... → local, optimised by next/image (AVIF/WebP, resized)
- *  - https://images.unsplash.com/...           → allowed remote host, optimised
+ *  - Cloudinary / Unsplash                    → allowed remote hosts, optimised
  *  - anything else                              → rendered unoptimised so an unexpected URL can't crash the page
  * A missing or broken photo shows a neutral tile, never a stand-in car a buyer might mistake for this one.
  */
@@ -32,7 +32,7 @@ export function CarImage({ src, alt, sizes, priority, className }: CarImageProps
     );
   }
 
-  const optimisable = src.startsWith("/") || src.startsWith("https://images.unsplash.com/");
+  const optimisable = src.startsWith("/") || src.startsWith("https://images.unsplash.com/") || src.startsWith("https://res.cloudinary.com/");
 
   return (
     <Image
@@ -40,7 +40,7 @@ export function CarImage({ src, alt, sizes, priority, className }: CarImageProps
       alt={alt}
       fill
       sizes={sizes}
-      priority={priority}
+      preload={priority}
       unoptimized={!optimisable}
       onError={() => setFailed(true)}
       className={cn("object-cover", className)}

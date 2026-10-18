@@ -1,4 +1,16 @@
 import mongoose, { Schema, Model } from "mongoose";
+import type { AppearanceSettings, WatermarkSettings } from "../site-config";
+
+/** A customer quote shown in the homepage reviews carousel, managed in Admin → SEO & content. */
+export interface ITestimonial {
+  _id?: string;
+  name: string;
+  role: string;
+  location?: string;
+  rating: number;
+  content: string;
+  published: boolean;
+}
 
 export interface ISiteSettings {
   siteName: string;
@@ -23,8 +35,15 @@ export interface ISiteSettings {
   maxImagesPerListing: number;
   metaTitleTemplate: string;
   metaDescription: string;
+  seoKeywords: string;
+  defaultOgImage: string;
+  testimonials: ITestimonial[];
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  /** Website builder: header, footer, homepage, brand colour and favicon (Admin → Appearance). */
+  appearance?: Partial<AppearanceSettings>;
+  /** How listing photos are watermarked on upload (Admin → Settings). */
+  watermark?: Partial<WatermarkSettings>;
   updatedAt: Date;
 }
 
@@ -35,7 +54,7 @@ const SiteSettingsSchema: Schema<ISiteSettings> = new Schema(
       type: String,
       default: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
     },
-    contactEmail: { type: String, default: "support@carhat.bd" },
+    contactEmail: { type: String, default: "carhatbd@gmail.com" },
     supportPhone: { type: String, default: "+880 1700-000000" },
     address: {
       type: String,
@@ -71,18 +90,33 @@ const SiteSettingsSchema: Schema<ISiteSettings> = new Schema(
     maxImagesPerListing: { type: Number, default: 10 },
     metaTitleTemplate: {
       type: String,
-      default: "%s | CarHat.bd - Modern Car Marketplace",
+      default: "%s | CarHat BD",
     },
     metaDescription: {
       type: String,
       default:
         "Buy, sell, and explore the best cars in Bangladesh on CarHat.bd. Find your perfect car with verified dealers and private sellers.",
     },
+    seoKeywords: { type: String, default: "" },
+    defaultOgImage: { type: String, default: "" },
+    testimonials: [
+      {
+        name: { type: String, required: true, trim: true, maxlength: 80 },
+        role: { type: String, trim: true, maxlength: 120, default: "" },
+        location: { type: String, trim: true, maxlength: 80, default: "" },
+        rating: { type: Number, min: 1, max: 5, default: 5 },
+        content: { type: String, required: true, trim: true, maxlength: 600 },
+        published: { type: Boolean, default: true },
+      },
+    ],
     maintenanceMode: { type: Boolean, default: false },
     maintenanceMessage: {
       type: String,
       default: "We're currently performing maintenance. Please check back soon!",
     },
+    // Shapes are validated by lib/site-config before saving; missing keys fall back to its defaults.
+    appearance: { type: Schema.Types.Mixed, default: undefined },
+    watermark: { type: Schema.Types.Mixed, default: undefined },
   },
   { timestamps: true }
 );

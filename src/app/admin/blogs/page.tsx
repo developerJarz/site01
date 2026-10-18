@@ -22,6 +22,10 @@ interface Blog {
   coverImage: string;
   author: string;
   tags: string[];
+  seoTitle?: string;
+  seoDescription?: string;
+  keywords?: string;
+  coverAlt?: string;
   published: boolean;
   views: number;
   createdAt: string;
@@ -34,6 +38,10 @@ const emptyForm = {
   coverImage: "",
   author: "CarHat Team",
   tags: "",
+  seoTitle: "",
+  seoDescription: "",
+  keywords: "",
+  coverAlt: "",
 };
 
 export default function AdminBlogsPage() {
@@ -75,6 +83,10 @@ export default function AdminBlogsPage() {
       coverImage: blog.coverImage,
       author: blog.author,
       tags: blog.tags?.join(", ") || "",
+      seoTitle: blog.seoTitle || "",
+      seoDescription: blog.seoDescription || "",
+      keywords: blog.keywords || "",
+      coverAlt: blog.coverAlt || "",
     });
     setShowForm(true);
   };
@@ -176,7 +188,7 @@ export default function AdminBlogsPage() {
         </div>
         <button
           onClick={showForm ? closeForm : openCreateForm}
-          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-card"
+          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-glow"
         >
           {showForm ? <X size={18} /> : <Plus size={18} />}
           {showForm ? "Cancel" : "New Post"}
@@ -242,6 +254,9 @@ export default function AdminBlogsPage() {
                   className="w-full h-40 object-cover rounded-lg mt-2 border border-border"
                 />
               )}
+              <label htmlFor="blog-cover-alt" className="mt-3 block text-sm font-medium mb-1">Cover image alt text</label>
+              <input id="blog-cover-alt" type="text" placeholder={formData.title || "Describe the cover photo"} value={formData.coverAlt}
+                onChange={(e) => setFormData({ ...formData, coverAlt: e.target.value })} className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -298,6 +313,25 @@ export default function AdminBlogsPage() {
                 className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none font-mono text-sm"
               />
             </div>
+            <fieldset className="space-y-3 rounded-xl border border-border p-4">
+              <legend className="px-1 text-sm font-bold">Search &amp; SEO (optional)</legend>
+              <p className="text-xs text-muted-foreground">Leave empty to use the title and excerpt.</p>
+              <div>
+                <label htmlFor="blog-seo-title" className="block text-sm font-medium mb-1">SEO title ({formData.seoTitle.length}/60)</label>
+                <input id="blog-seo-title" type="text" placeholder={formData.title} value={formData.seoTitle}
+                  onChange={(e) => setFormData({ ...formData, seoTitle: e.target.value })} className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
+              </div>
+              <div>
+                <label htmlFor="blog-seo-desc" className="block text-sm font-medium mb-1">Meta description ({formData.seoDescription.length}/158)</label>
+                <textarea id="blog-seo-desc" rows={2} placeholder={formData.excerpt} value={formData.seoDescription}
+                  onChange={(e) => setFormData({ ...formData, seoDescription: e.target.value })} className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none" />
+              </div>
+              <div>
+                <label htmlFor="blog-keywords" className="block text-sm font-medium mb-1">Focus keywords (comma-separated)</label>
+                <input id="blog-keywords" type="text" placeholder="e.g. Toyota Axio price in Bangladesh, Axio review" value={formData.keywords}
+                  onChange={(e) => setFormData({ ...formData, keywords: e.target.value })} className="w-full px-4 py-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
+              </div>
+            </fieldset>
             <div className="flex justify-end gap-3">
               <button
                 onClick={closeForm}
@@ -308,7 +342,7 @@ export default function AdminBlogsPage() {
               <button
                 onClick={saveBlog}
                 disabled={actionLoading === (editingBlog?._id || "new")}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50"
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-glow disabled:opacity-50"
               >
                 {actionLoading === (editingBlog?._id || "new") ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -380,8 +414,8 @@ export default function AdminBlogsPage() {
                       <span
                         className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                           blog.published
-                            ? "bg-green-500/10 text-verified"
-                            : "bg-amber-500/10 text-[#7a5200]"
+                            ? "bg-verified-soft text-verified"
+                            : "bg-warning-soft text-warning"
                         }`}
                       >
                         {blog.published ? "Published" : "Draft"}
@@ -410,7 +444,7 @@ export default function AdminBlogsPage() {
                           href={`/blog/${blog.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                          className="p-2 text-electric hover:bg-haze rounded-lg transition-colors"
                           title="View on Site"
                         >
                           <ExternalLink size={18} />
@@ -421,8 +455,8 @@ export default function AdminBlogsPage() {
                           onClick={() => togglePublish(blog._id, blog.published)}
                           className={`p-2 rounded-lg transition-colors ${
                             blog.published
-                              ? "text-amber-500 hover:bg-amber-500/10"
-                              : "text-verified hover:bg-green-500/10"
+                              ? "text-warning hover:bg-warning-soft"
+                              : "text-verified hover:bg-verified-soft"
                           }`}
                           title={
                             blog.published ? "Unpublish" : "Publish"
@@ -438,7 +472,7 @@ export default function AdminBlogsPage() {
                         <button
                           disabled={actionLoading === blog._id}
                           onClick={() => deleteBlog(blog._id)}
-                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-2 text-destructive hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50"
                           title="Delete Post"
                         >
                           {actionLoading === blog._id ? (

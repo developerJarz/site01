@@ -1,23 +1,39 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef, Suspense } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PageLoader } from "@/components/ui/brand-loader";
 import Link from "next/link";
-import {
-  MessageSquare,
-  Send,
-  Loader2,
-  ChevronLeft,
-  User as UserIcon,
-  Search,
-  Car
-} from "lucide-react";
-import axios from "axios";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { ArrowLeft, Car, ExternalLink, Loader2, MessageSquare, Search, Send } from "lucide-react";
+import { CarImage } from "@/components/CarImage";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Breadcrumbs, CONTAINER } from "@/components/ui/page";
+import { cn, formatLakh, timeAgo } from "@/lib/utils";
+
+interface Conversation {
+  _id: string;
+  otherParty: { _id: string; name: string; avatar: string | null };
+  listing: { _id: string; title: string; slug: string; image: string | null; price: number; status?: string };
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  isBuyer: boolean;
+}
+interface ChatMessage {
+  _id: string;
+  content: string;
+  createdAt: string;
+  sender: { _id: string; name: string; avatar?: string } | null;
+}
+
+const QUICK_REPLIES_BUYER = ["Is this car still available?", "What's your best price?", "Can I see it this weekend?", "Are the papers up to date?"];
+const QUICK_REPLIES_SELLER = ["Yes, it's still available.", "You're welcome to come and see it.", "The papers are all up to date."];
 
 export default function MessagesPage() {
   return (
-    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 size={32} className="animate-spin text-primary" /></div>}>
+    <Suspense fallback={<PageLoader />}>
       <MessagesContent />
     </Suspense>
   );
@@ -27,289 +43,225 @@ function MessagesContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeConversationId = searchParams.get("conversation");
+  const activeId = searchParams.get("conversation");
+  const userId = (session?.user as { id?: string } | undefined)?.id;
 
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[] | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [newMessage, setNewMessage] = useState("");
+  const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Mobile view state (show list vs show chat)
-  const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const scroller = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
+    if (status === "unauthenticated") router.replace("/login?callbackUrl=%2Fdashboard%2Fmessages");
   }, [status, router]);
 
-  // Fetch conversations
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
-      const res = await axios.get("/api/conversations");
-      setConversations(res.data.conversations);
-      setLoadingConversations(false);
-    } catch (err) {
-      console.error("Failed to fetch conversations", err);
-      setLoadingConversations(false);
+      const res = await fetch("/api/conversations", { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok) setConversations(data.conversations || []);
+      else setConversations((c) => c ?? []);
+    } catch {
+      setConversations((c) => c ?? []);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchConversations();
-    }
-  }, [status]);
-
-  // Fetch messages for active conversation
-  const fetchMessages = async (convId: string, showLoading = true) => {
+  const fetchMessages = useCallback(async (id: string, showLoading = true) => {
     if (showLoading) setLoadingMessages(true);
     try {
-      const res = await axios.get(`/api/conversations/${convId}/messages`);
-      setMessages(res.data.messages);
-      
-      // Update unread count locally
-      setConversations(prev => prev.map(c => 
-        c._id === convId ? { ...c, unreadCount: 0 } : c
-      ));
-    } catch (err) {
-      console.error("Failed to fetch messages", err);
+      const res = await fetch(`/api/conversations/${id}/messages`, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't load this chat.");
+      setMessages(data.messages || []);
+      setConversations((prev) => prev?.map((c) => (c._id === id ? { ...c, unreadCount: 0 } : c)) || prev);
+    } catch (e) {
+      if (showLoading) setError((e as Error).message);
     } finally {
       if (showLoading) setLoadingMessages(false);
     }
-  };
+  }, []);
 
-  // Setup active conversation
   useEffect(() => {
-    if (activeConversationId && status === "authenticated") {
-      fetchMessages(activeConversationId);
-      setShowChatOnMobile(true);
-    } else {
-      setShowChatOnMobile(false);
-      setMessages([]);
-    }
-  }, [activeConversationId, status]);
+    if (status === "authenticated") void fetchConversations();
+  }, [status, fetchConversations]);
 
-  // Polling for active conversation
   useEffect(() => {
-    if (!activeConversationId || status !== "authenticated") return;
-    
-    const interval = setInterval(() => {
-      fetchMessages(activeConversationId, false);
-      fetchConversations(); // Also update list to get latest messages/unread counts for other convos
-    }, 3000);
-    
-    return () => clearInterval(interval);
-  }, [activeConversationId, status]);
+    setError("");
+    setMessages([]);
+    if (activeId && status === "authenticated") void fetchMessages(activeId);
+  }, [activeId, status, fetchMessages]);
 
-  // Auto-scroll to bottom of messages container without scrolling the page
+  // Poll while the tab is visible: the open chat every 4s, the inbox every 15s.
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
+    if (status !== "authenticated") return;
+    const tick = (fn: () => void) => () => { if (document.visibilityState === "visible") fn(); };
+    const chat = activeId ? setInterval(tick(() => void fetchMessages(activeId, false)), 4000) : undefined;
+    const inbox = setInterval(tick(() => void fetchConversations()), 15000);
+    return () => {
+      if (chat) clearInterval(chat);
+      clearInterval(inbox);
+    };
+  }, [activeId, status, fetchMessages, fetchConversations]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeConversationId || sending) return;
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
+  }, [messages.length]);
 
-    const content = newMessage.trim();
-    setNewMessage(""); // Optimistic clear
+  const send = async (text: string) => {
+    const content = text.trim();
+    if (!content || !activeId || sending) return;
+    setDraft("");
     setSending(true);
-
+    setError("");
     try {
-      await axios.post(`/api/conversations/${activeConversationId}/messages`, {
-        content,
+      const res = await fetch(`/api/conversations/${activeId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
       });
-      fetchMessages(activeConversationId, false);
-      fetchConversations();
-    } catch (err) {
-      console.error("Failed to send message", err);
-      setNewMessage(content); // Restore on fail
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Message not sent.");
+      await Promise.all([fetchMessages(activeId, false), fetchConversations()]);
+    } catch (e) {
+      setDraft(content);
+      setError((e as Error).message);
     } finally {
       setSending(false);
+      input.current?.focus();
     }
   };
 
-  const handleSelectConversation = (id: string) => {
-    router.push(`/dashboard/messages?conversation=${id}`);
-  };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!conversations) return [];
+    return q ? conversations.filter((c) => c.otherParty.name.toLowerCase().includes(q) || c.listing.title.toLowerCase().includes(q)) : conversations;
+  }, [conversations, query]);
 
-  if (status === "loading" || loadingConversations) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-primary" />
-      </div>
-    );
+  if (status !== "authenticated" || conversations === null) {
+    return <PageLoader />;
   }
 
-  const activeConversation = conversations.find(c => c._id === activeConversationId);
-  const userId = (session?.user as any)?.id;
+  const active = conversations.find((c) => c._id === activeId);
+  const totalUnread = conversations.reduce((n, c) => n + c.unreadCount, 0);
+  const quickReplies = active?.isBuyer ? QUICK_REPLIES_BUYER : QUICK_REPLIES_SELLER;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6 hidden md:flex">
-        <Link href="/" className="hover:text-primary transition-colors">Home</Link>
-        <span>/</span>
-        <Link href="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">Messages</span>
-      </nav>
+    <div className={cn(CONTAINER, "py-6 md:py-8")}>
+      <div className="mb-5 hidden md:block">
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Messages" }]} />
+      </div>
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm h-[700px] max-h-[80vh] flex">
-        
-        {/* Left Sidebar - Conversations List */}
-        <div className={`w-full md:w-1/3 border-r border-border flex flex-col ${showChatOnMobile ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-4 border-b border-border bg-muted/30">
-            <h2 className="font-bold text-lg flex items-center gap-2">
-              <MessageSquare size={20} className="text-primary" />
+      <div className="flex h-[calc(100dvh-7rem)] overflow-hidden rounded-3xl border border-hairline bg-white shadow-soft md:h-[calc(100dvh-12rem)] lg:h-[calc(100dvh-14rem)]">
+        {/* Inbox */}
+        <aside className={cn("flex w-full flex-col border-r border-hairline md:w-[22rem] md:shrink-0", active ? "hidden md:flex" : "flex")} aria-label="Conversations">
+          <div className="border-b border-hairline p-4">
+            <h1 className="flex items-center gap-2 text-xl font-extrabold">
               Messages
-            </h2>
-            <div className="mt-4 relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Search conversations..." 
-                className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg outline-none focus:ring-1 focus:ring-primary text-sm"
-              />
+              {totalUnread > 0 && <span className="rounded-full bg-electric px-2 py-0.5 text-xs font-bold text-white tabular">{totalUnread}</span>}
+            </h1>
+            <div className="relative mt-3">
+              <label htmlFor="chat-search" className="sr-only">Search conversations</label>
+              <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-text" aria-hidden />
+              <input id="chat-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or car" className="field h-11 pl-10 text-[15px]" />
             </div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
-                <p>No messages yet.</p>
+          <div className="grow overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-6 py-14 text-center">
+                <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-haze text-electric"><MessageSquare size={22} aria-hidden /></span>
+                <p className="mt-4 font-bold">{conversations.length ? "No matches" : "No messages yet"}</p>
+                <p className="mt-1 text-sm text-slate-text">{conversations.length ? "Try another name or car." : "Message a seller from any car page and the chat appears here."}</p>
+                {!conversations.length && <Button asChild variant="secondary" className="mt-5"><Link href="/cars">Browse cars</Link></Button>}
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {conversations.map((conv) => (
-                  <button
-                    key={conv._id}
-                    onClick={() => handleSelectConversation(conv._id)}
-                    className={`w-full text-left p-4 hover:bg-muted/50 transition-colors flex gap-3 ${activeConversationId === conv._id ? 'bg-primary/5 border-l-2 border-primary' : ''}`}
-                  >
-                    <div className="relative">
-                      {conv.otherParty.avatar ? (
-                        <img src={conv.otherParty.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold">
-                          {conv.otherParty.name[0]}
-                        </div>
-                      )}
-                      {conv.unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-card">
-                          {conv.unreadCount}
+              <ul className="space-y-1 p-2">
+                {filtered.map((c) => (
+                  <li key={c._id}>
+                    <Link href={`/dashboard/messages?conversation=${c._id}`} aria-current={c._id === activeId ? "true" : undefined}
+                      className={cn("flex gap-3 rounded-2xl p-3 transition-colors", c._id === activeId ? "bg-haze" : "hover:bg-mist")}>
+                      <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-mist">
+                        <CarImage src={c.listing.image} alt="" sizes="48px" />
+                      </span>
+                      <span className="min-w-0 grow">
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className={cn("truncate text-sm", c.unreadCount ? "font-extrabold" : "font-semibold")}>{c.otherParty.name}</span>
+                          <span className="shrink-0 text-[11px] text-slate-text">{timeAgo(c.lastMessageAt)}</span>
                         </span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline mb-1">
-                        <h3 className="font-semibold text-sm truncate pr-2">{conv.otherParty.name}</h3>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                          {new Date(conv.lastMessageAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        <span className="block truncate text-xs font-semibold text-electric">{c.listing.title}</span>
+                        <span className="mt-0.5 flex items-center gap-2">
+                          <span className={cn("grow truncate text-[13px]", c.unreadCount ? "font-semibold text-night" : "text-slate-text")}>{c.lastMessage || "Started a conversation"}</span>
+                          {c.unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-electric px-1.5 text-[11px] font-bold text-white tabular">{c.unreadCount}</span>}
                         </span>
-                      </div>
-                      <p className="text-xs text-primary font-medium truncate mb-1 flex items-center gap-1">
-                        <Car size={10} /> {conv.listing.title}
-                      </p>
-                      <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
-                        {conv.lastMessage || "Started a conversation"}
-                      </p>
-                    </div>
-                  </button>
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
-        </div>
+        </aside>
 
-        {/* Right Area - Active Chat */}
-        <div className={`w-full md:w-2/3 flex flex-col ${!showChatOnMobile ? 'hidden md:flex' : 'flex'}`}>
-          {!activeConversationId ? (
-            <div className="flex-1 flex flex-col items-center justify-center bg-muted/10 p-8 text-center">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                <MessageSquare size={32} className="text-primary opacity-50" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Your Messages</h3>
-              <p className="text-muted-foreground max-w-sm">
-                Select a conversation from the sidebar to view your messages or reply to inquiries.
-              </p>
+        {/* Chat */}
+        <section className={cn("min-w-0 grow flex-col", active ? "flex" : "hidden md:flex")} aria-label="Chat">
+          {!activeId ? (
+            <div className="flex grow flex-col items-center justify-center bg-mist/50 p-8 text-center">
+              <span className="flex size-16 items-center justify-center rounded-2xl bg-white text-electric shadow-soft"><MessageSquare size={28} aria-hidden /></span>
+              <h2 className="mt-5 text-xl font-extrabold">Your conversations</h2>
+              <p className="mt-1 max-w-sm text-slate-text">Pick a chat on the left to read and reply.</p>
             </div>
-          ) : !activeConversation ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Loader2 size={32} className="animate-spin text-primary" />
-            </div>
+          ) : !active ? (
+            <div className="flex grow items-center justify-center p-8 text-center text-slate-text">This conversation isn&apos;t available.</div>
           ) : (
             <>
-              {/* Chat Header */}
-              <div className="p-4 border-b border-border flex items-center gap-3 bg-muted/10">
-                <button 
-                  onClick={() => router.push("/dashboard/messages")}
-                  className="md:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-                
-                {activeConversation.otherParty.avatar ? (
-                  <img src={activeConversation.otherParty.avatar} alt="" className="w-10 h-10 rounded-full object-cover hidden sm:block" />
-                ) : (
-                  <div className="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold hidden sm:flex">
-                    {activeConversation.otherParty.name[0]}
-                  </div>
-                )}
-                
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold truncate">{activeConversation.otherParty.name}</h3>
-                  <Link href={`/cars/${activeConversation.listing.slug}`} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                    {activeConversation.listing.title} • ৳ {activeConversation.listing.price?.toLocaleString()}
-                  </Link>
+              <header className="flex items-center gap-3 border-b border-hairline px-4 py-3">
+                <Link href="/dashboard/messages" className="-ml-1 flex size-10 items-center justify-center rounded-full text-slate-text hover:bg-mist md:hidden" aria-label="Back to conversations">
+                  <ArrowLeft size={20} aria-hidden />
+                </Link>
+                <UserAvatar src={active.otherParty.avatar} name={active.otherParty.name} size={40} />
+                <div className="min-w-0 grow">
+                  <p className="truncate font-bold">{active.otherParty.name}</p>
+                  <p className="text-xs text-slate-text">{active.isBuyer ? "Seller" : "Interested buyer"}</p>
                 </div>
-              </div>
+              </header>
+              <Link href={`/cars/${active.listing.slug}`} className="flex items-center gap-3 border-b border-hairline bg-mist/60 px-4 py-2.5 transition-colors hover:bg-haze/60">
+                <span className="relative h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-white"><CarImage src={active.listing.image} alt="" sizes="56px" /></span>
+                <span className="min-w-0 grow">
+                  <span className="block truncate text-sm font-semibold">{active.listing.title}</span>
+                  <span className="price-tag text-sm text-electric">{formatLakh(active.listing.price)}</span>
+                  {active.listing.status === "sold" && <span className="ml-2 text-xs font-semibold text-slate-text">Sold</span>}
+                </span>
+                <ExternalLink size={16} className="shrink-0 text-slate-text" aria-hidden />
+              </Link>
 
-              {/* Chat Messages */}
-              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
+              <div ref={scroller} className="grow space-y-1 overflow-y-auto bg-[#fbfcfe] px-4 py-5" aria-live="polite">
                 {loadingMessages && messages.length === 0 ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 size={24} className="animate-spin text-primary" />
-                  </div>
+                  <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-electric" aria-label="Loading messages" /></div>
                 ) : messages.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">
-                    No messages yet. Send a message to start the conversation!
-                  </div>
+                  <p className="py-12 text-center text-sm text-slate-text">No messages yet. Say hello below.</p>
                 ) : (
-                  messages.map((msg, idx) => {
-                    const isMe = msg.sender._id === userId;
-                    const showAvatar = !isMe && (idx === 0 || messages[idx - 1].sender._id !== msg.sender._id);
-                    
+                  messages.map((m, i) => {
+                    const mine = m.sender?._id === userId;
+                    const day = new Date(m.createdAt).toDateString();
+                    const newDay = i === 0 || new Date(messages[i - 1].createdAt).toDateString() !== day;
                     return (
-                      <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4`}>
-                        {!isMe && (
-                          <div className="w-8 flex-shrink-0 mr-2">
-                            {showAvatar && (
-                              msg.sender.avatar ? (
-                                <img src={msg.sender.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
-                              ) : (
-                                <div className="w-8 h-8 bg-muted text-muted-foreground rounded-full flex items-center justify-center text-xs font-bold">
-                                  {msg.sender.name[0]}
-                                </div>
-                              )
-                            )}
-                          </div>
+                      <div key={m._id}>
+                        {newDay && (
+                          <p className="my-4 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-text">
+                            {new Date(m.createdAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                          </p>
                         )}
-                        
-                        <div className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
-                          isMe 
-                            ? 'bg-primary text-primary-foreground rounded-tr-sm' 
-                            : 'bg-muted text-foreground rounded-tl-sm'
-                        }`}>
-                          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                          <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+                          <div className={cn("max-w-[80%] rounded-2xl px-4 py-2.5 text-[15px] shadow-sm sm:max-w-[70%]",
+                            mine ? "rounded-br-md bg-electric text-white" : "rounded-bl-md border border-hairline bg-white text-night")}>
+                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                            <p className={cn("mt-1 text-right text-[10px]", mine ? "text-white/75" : "text-slate-text")}>
+                              {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -318,29 +270,34 @@ function MessagesContent() {
                 )}
               </div>
 
-              {/* Message Input */}
-              <div className="p-4 border-t border-border bg-muted/10">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 bg-background border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newMessage.trim() || sending}
-                    className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 disabled:opacity-50 transition-colors flex-shrink-0 shadow-sm"
-                  >
-                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-1" />}
-                  </button>
+              <div className="border-t border-hairline p-3">
+                {messages.length < 3 && (
+                  <div className="scrollbar-none -mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1">
+                    {quickReplies.map((q) => (
+                      <button key={q} type="button" onClick={() => send(q)} disabled={sending}
+                        className="h-8 shrink-0 rounded-full border border-hairline px-3 text-[13px] font-semibold text-slate-text transition-colors hover:border-electric/40 hover:text-electric">
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
+                <form onSubmit={(e) => { e.preventDefault(); void send(draft); }} className="flex items-end gap-2">
+                  <label htmlFor="chat-input" className="sr-only">Message</label>
+                  <textarea id="chat-input" ref={input} rows={1} value={draft} maxLength={2000}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(draft); } }}
+                    placeholder="Write a message…" className="field max-h-32 min-h-12 resize-none py-3" />
+                  <Button type="submit" size="icon" className="size-12 shrink-0 rounded-2xl" disabled={!draft.trim() || sending} aria-label="Send message">
+                    {sending ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <Send size={18} aria-hidden />}
+                  </Button>
                 </form>
               </div>
             </>
           )}
-        </div>
+        </section>
       </div>
+      <p className="mt-3 hidden items-center gap-1.5 text-xs text-slate-text md:flex"><Car size={13} aria-hidden /> Keep payments off chat until you&apos;ve seen the car and its papers in person.</p>
     </div>
   );
 }

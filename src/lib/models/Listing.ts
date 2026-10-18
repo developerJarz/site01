@@ -24,6 +24,11 @@ export interface IListing {
   paperVerificationNote?: string;
   videos?: string[];
   features: string[];
+  /** Optional search overrides; empty means generated from the car details (lib/seo-text). */
+  seoTitle?: string;
+  seoDescription?: string;
+  /** Alt text per photo, same order as images. Empty entries are generated. */
+  imageAlts?: string[];
   views: number;
   status: "active" | "pending" | "sold" | "removed";
   featured: boolean;
@@ -63,6 +68,9 @@ const ListingSchema: Schema<IListing> = new Schema(
     paperVerificationNote: { type: String },
     videos: [{ type: String }],
     features: [{ type: String }],
+    seoTitle: { type: String, trim: true, maxlength: 120 },
+    seoDescription: { type: String, trim: true, maxlength: 320 },
+    imageAlts: [{ type: String, trim: true, maxlength: 200 }],
     views: { type: Number, default: 0 },
     status: {
       type: String,

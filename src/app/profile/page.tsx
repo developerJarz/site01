@@ -1,627 +1,320 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  User as UserIcon,
-  Mail,
-  Phone,
-  MapPin,
-  Building2,
-  Shield,
-  Save,
-  Loader2,
-  Camera,
-  CheckCircle2,
-  XCircle,
-  Key,
-  Store,
-  BadgeCheck,
-  FileText,
-} from "lucide-react";
+import { PageLoader } from "@/components/ui/brand-loader";
 import Link from "next/link";
-import axios from "axios";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { BadgeCheck, CalendarDays, Camera, CheckCircle2, KeyRound, LayoutDashboard, Loader2, MessageCircle, Phone, RotateCcw, Save, Store, UserRound } from "lucide-react";
+import { ProfilePhotoUpload } from "@/components/ProfilePhotoUpload";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Alert, CONTAINER, PageHero } from "@/components/ui/page";
+import { cn } from "@/lib/utils";
+import { ContactNumberFields } from "@/components/ContactNumberFields";
+import { formatPhoneNumber, localPhoneNumber, normalisePhoneNumber, usesPhoneForWhatsApp } from "@/lib/contact-details";
+import { parseProfileUpdates, profileCompletion } from "@/lib/profile";
 
 interface Profile {
   _id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   avatar?: string;
   role: string;
-  bio: string;
-  address: string;
-  city: string;
-  dealershipName: string;
-  dealershipLicense: string;
+  bio?: string;
+  address?: string;
+  city?: string;
+  dealershipName?: string;
+  dealershipLicense?: string;
   isVerified: boolean;
   whatsappNumber?: string;
+  whatsappSameAsPhone?: boolean;
   allowPhoneDisplay?: boolean;
   allowWhatsApp?: boolean;
   createdAt: string;
+  hasPassword?: boolean;
+}
+
+const EMPTY = {
+  name: "", phone: "", bio: "", address: "", city: "", dealershipName: "", dealershipLicense: "",
+  whatsappNumber: "", whatsappSameAsPhone: true, allowPhoneDisplay: true, allowWhatsApp: true,
+};
+
+function formFromProfile(user: Profile) {
+  return {
+    name: user.name || "", phone: localPhoneNumber(user.phone), bio: user.bio || "", address: user.address || "", city: user.city || "",
+    dealershipName: user.dealershipName || "", dealershipLicense: user.dealershipLicense || "",
+    whatsappNumber: localPhoneNumber(user.whatsappNumber), whatsappSameAsPhone: usesPhoneForWhatsApp(user),
+    allowPhoneDisplay: user.allowPhoneDisplay ?? true, allowWhatsApp: user.allowWhatsApp ?? true,
+  };
 }
 
 export default function ProfilePage() {
-  const { data: session, status, update } = useSession();
+  const { status, update } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [retry, setRetry] = useState(0);
 
-  // Password change
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  // Editable fields
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    phone: "+880",
-    bio: "",
-    address: "",
-    city: "",
-    dealershipName: "",
-    dealershipLicense: "",
-    whatsappNumber: "+880",
-    allowPhoneDisplay: true,
-    allowWhatsApp: true,
-  });
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
+    if (status === "unauthenticated") router.replace("/login?callbackUrl=%2Fprofile");
   }, [status, router]);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      fetch("/api/user/profile")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.user) {
-            setProfile(data.user);
-            setForm({
-              name: data.user.name || "",
-              phone: data.user.phone || "+880",
-              bio: data.user.bio || "",
-              address: data.user.address || "",
-              city: data.user.city || "",
-              dealershipName: data.user.dealershipName || "",
-              dealershipLicense: data.user.dealershipLicense || "",
-              whatsappNumber: data.user.whatsappNumber || "+880",
-              allowPhoneDisplay: data.user.allowPhoneDisplay ?? true,
-              allowWhatsApp: data.user.allowWhatsApp ?? true,
-            });
-          }
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [status]);
+    if (status !== "authenticated") return;
+    const controller = new AbortController();
+    setLoadError("");
+    fetch("/api/user/profile", { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.user) throw new Error(data.error || "Couldn't load your profile.");
+        return data;
+      })
+      .then((data) => {
+        const u: Profile = data.user;
+        setProfile(u);
+        setForm(formFromProfile(u));
+      }).catch((error) => { if (!controller.signal.aborted) setLoadError(error.message || "Couldn't load your profile. Try again."); });
+    return () => controller.abort();
+  }, [status, retry]);
 
-  const handleSave = async () => {
+  const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setMessage(null); setForm((f) => ({ ...f, [k]: e.target.value })); };
+  const dirty = profile ? JSON.stringify(form) !== JSON.stringify(formFromProfile(profile)) : false;
+
+  // Warn before leaving the page with unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseProfileUpdates(form, profile || {});
+    if (!parsed.ok) return setMessage({ tone: "error", text: parsed.error });
     setSaving(true);
-    setError("");
-    setSuccess("");
+    setMessage(null);
     try {
-      const res = await axios.patch("/api/user/profile", form);
-      setProfile(res.data.user);
-      setEditing(false);
-      setSuccess("Profile updated successfully");
-      update();
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to update profile");
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.value),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't save your profile.");
+      setProfile(data.user);
+      setForm(formFromProfile(data.user));
+      setMessage({ tone: "success", text: "Profile saved." });
+      void update().catch(() => {});
+    } catch (err) {
+      setMessage({ tone: "error", text: (err as Error).message });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError("");
-    setPasswordSuccess("");
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
-      return;
-    }
-
-    setChangingPassword(true);
+    setPwMessage(null);
+    if (pw.next.length < 8) return setPwMessage({ tone: "error", text: "Use at least 8 characters for your new password." });
+    if (pw.next !== pw.confirm) return setPwMessage({ tone: "error", text: "The new passwords don't match." });
+    setPwSaving(true);
     try {
-      await axios.post("/api/user/password", { currentPassword, newPassword });
-      setPasswordSuccess("Password changed successfully");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordError(err.response?.data?.error || "Failed to change password");
+      const res = await fetch("/api/user/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't change your password.");
+      setPw({ current: "", next: "", confirm: "" });
+      setPwMessage({ tone: "success", text: "Password changed." });
+    } catch (err) {
+      setPwMessage({ tone: "error", text: (err as Error).message });
     } finally {
-      setChangingPassword(false);
+      setPwSaving(false);
     }
   };
 
-  if (status === "loading" || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-primary" />
-      </div>
-    );
+  if (!profile) {
+    if (loadError) return <div className={cn(CONTAINER, "max-w-xl py-14")}><Alert>{loadError}</Alert><Button onClick={() => setRetry((current) => current + 1)} variant="secondary" className="mt-4"><RotateCcw size={16} aria-hidden /> Try again</Button></div>;
+    return <PageLoader />;
   }
 
-  if (!profile) return null;
-
   const isDealer = profile.role === "dealer";
+  const completion = profileCompletion(profile);
+  const originalForm = formFromProfile(profile);
+  // Accounts without numbers (Auth0 sign-ups, older accounts) see the contact card first.
+  const needsNumbers = !normalisePhoneNumber(profile.phone);
+  const hasPhone = Boolean(normalisePhoneNumber(form.phone));
+  const hasWhatsApp = Boolean(normalisePhoneNumber(form.whatsappSameAsPhone ? form.phone : form.whatsappNumber));
+
+  const personalCard = (
+    <Card icon={UserRound} title="Personal details" description="Shown to buyers on your listings.">
+      <div className="grid gap-5 md:grid-cols-2">
+        <Field id="p-name" label="Full name"><input id="p-name" className="field" value={form.name} onChange={set("name")} autoComplete="name" maxLength={80} required /></Field>
+        <Field id="p-email" label="Sign-in email"><input id="p-email" type="email" className="field bg-mist text-slate-text" value={profile.email} readOnly autoComplete="email" /></Field>
+        <Field id="p-city" label="City"><input id="p-city" className="field" value={form.city} onChange={set("city")} placeholder="e.g. Dhaka" autoComplete="address-level2" maxLength={80} /></Field>
+        <Field id="p-address" label="Address"><input id="p-address" className="field" value={form.address} onChange={set("address")} placeholder="e.g. House 12, Road 5, Gulshan-1" autoComplete="street-address" maxLength={200} /></Field>
+        <Field id="p-bio" label="About you" className="md:col-span-2">
+          <textarea id="p-bio" className="field" rows={3} value={form.bio} onChange={set("bio")} maxLength={500} placeholder="A line or two buyers will see, e.g. how long you've owned the car." />
+        </Field>
+      </div>
+    </Card>
+  );
+
+  const contactCard = (
+    <Card id="contact-details" icon={Phone} title="Contact and privacy"
+      description={needsNumbers ? "Add the numbers buyers can reach you on. Every listing you post uses them." : "Saved from your signup. Changes here update all your listings straight away."}>
+      <ContactNumberFields idPrefix="p" value={form} disabled={saving} onChange={(contact) => { setMessage(null); setForm((current) => ({ ...current, ...contact })); }} />
+      <div className="mt-5 divide-y divide-hairline rounded-2xl border border-hairline">
+        <Toggle icon={Phone} label="Show my phone number" hint={hasPhone ? "Buyers can tap to reveal and call you." : "Add a phone number to turn this on."}
+          checked={hasPhone && form.allowPhoneDisplay} disabled={!hasPhone} onChange={(v) => { setMessage(null); setForm((f) => ({ ...f, allowPhoneDisplay: v })); }} />
+        <Toggle icon={MessageCircle} label="Show a WhatsApp button" hint={hasWhatsApp ? "Opens a chat with the car's name filled in." : "Add a WhatsApp number to turn this on."}
+          checked={hasWhatsApp && form.allowWhatsApp} disabled={!hasWhatsApp} onChange={(v) => { setMessage(null); setForm((f) => ({ ...f, allowWhatsApp: v })); }} />
+      </div>
+    </Card>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Link href="/" className="hover:text-primary transition-colors">Home</Link>
-        <span>/</span>
-        <Link href="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">Profile</span>
-      </nav>
+    <>
+      <PageHero
+        eyebrow="Account"
+        title="Profile and settings"
+        breadcrumbs={[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Profile" }]}
+        description={<p>{profile.email}</p>}
+        actions={<Button asChild variant="secondary"><Link href="/dashboard"><LayoutDashboard size={16} aria-hidden /> My dashboard</Link></Button>}
+      />
 
-      {/* Profile Header */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-primary to-primary/60 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-card">
-              {profile.name?.[0] || "U"}
+      <div className={cn(CONTAINER, "grid gap-8 py-10 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
+        <div className="min-w-0 space-y-6">
+          <section aria-labelledby="profile-completion-heading" className="rounded-3xl border border-electric/15 bg-haze/60 p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="profile-completion-heading" className="font-bold text-night">{completion.percentage === 100 ? "Your profile is complete" : "Make your profile ready for buyers"}</h2>
+              <span className="shrink-0 text-lg font-extrabold text-electric">{completion.percentage}%</span>
             </div>
-            {editing && (
-              <button className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1.5 shadow-lg hover:bg-primary/90 transition-colors">
-                <Camera size={14} />
-              </button>
+            <div role="progressbar" aria-label="Profile completeness" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100} className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-electric transition-[width] motion-reduce:transition-none" style={{ width: `${completion.percentage}%` }} /></div>
+            <p className="mt-3 text-sm text-slate-text">{completion.completed} of {completion.total} details added.{completion.missing.length > 0 && ` Still to add: ${completion.missing.join(", ")}.`}</p>
+            {(!normalisePhoneNumber(profile.phone) || !normalisePhoneNumber(profile.whatsappNumber)) && <a href="#contact-details" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-electric">Add your contact numbers</a>}
+          </section>
+          <Card icon={Camera} title="Profile photo" description="Help buyers recognise you. Your photo saves separately from your other details.">
+            <ProfilePhotoUpload avatar={profile.avatar} name={profile.name} onChange={(avatar) => {
+              setProfile((current) => current ? { ...current, avatar } : current);
+              void update().catch(() => {});
+            }} />
+          </Card>
+          <form onSubmit={save} className="space-y-6">
+            {needsNumbers ? <>{contactCard}{personalCard}</> : <>{personalCard}{contactCard}</>}
+
+            {isDealer && (
+              <Card icon={Store} title="Dealership" description="Your showroom name replaces your own on listings.">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <Field id="p-dealer" label="Dealership name"><input id="p-dealer" className="field" value={form.dealershipName} onChange={set("dealershipName")} placeholder="e.g. Dhaka Car Hub" /></Field>
+                  <Field id="p-license" label="Trade licence number"><input id="p-license" className="field" value={form.dealershipLicense} onChange={set("dealershipLicense")} placeholder="e.g. TRAD/DNCC/012345" /></Field>
+                </div>
+              </Card>
             )}
-          </div>
-          <div className="flex-grow">
-            {editing ? (
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="text-2xl font-bold bg-background border border-border rounded-lg px-3 py-1 w-full max-w-md focus:ring-2 focus:ring-primary outline-none"
-              />
-            ) : (
-              <h1 className="text-2xl font-bold">{profile.name}</h1>
-            )}
-            <p className="text-muted-foreground flex items-center gap-2 mt-1">
-              <Mail size={14} />
-              {profile.email}
-            </p>
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <span className="capitalize bg-primary/10 text-primary px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
-                <UserIcon size={12} />
-                {profile.role}
-              </span>
-              {profile.isVerified && (
-                <span className="text-verified bg-green-500/10 px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
-                  <BadgeCheck size={12} />
-                  Verified
-                </span>
-              )}
-              {isDealer && profile.dealershipName && (
-                <span className="text-teal-ink bg-accent px-3 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
-                  <Store size={12} />
-                  {profile.dealershipName}
-                </span>
-              )}
+
+            <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-hairline bg-white/95 p-4 shadow-soft backdrop-blur md:bottom-5">
+              {message ? <Alert tone={message.tone} className="basis-full">{message.text}</Alert> : <p className="mr-auto flex items-center gap-2 text-sm text-slate-text">{!dirty && <CheckCircle2 size={16} className="text-verified" aria-hidden />}{dirty ? "You have unsaved changes" : "Your details are up to date"}</p>}
+              {dirty && <Button type="button" variant="ghost" disabled={saving} onClick={() => { setForm(originalForm); setMessage(null); }}>Reset</Button>}
+              <Button type="submit" size="lg" disabled={saving || !dirty}>
+                {saving ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <Save size={17} aria-hidden />} Save changes
+              </Button>
             </div>
-          </div>
-          <div className="flex gap-2">
-            {!editing ? (
-              <button
-                onClick={() => setEditing(true)}
-                className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card"
-              >
-                Edit Profile
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setEditing(false);
-                    setForm({
-                      name: profile.name || "",
-                      phone: profile.phone || "",
-                      bio: profile.bio || "",
-                      address: profile.address || "",
-                      city: profile.city || "",
-                      dealershipName: profile.dealershipName || "",
-                      dealershipLicense: profile.dealershipLicense || "",
-                      whatsappNumber: profile.whatsappNumber || "",
-                      allowPhoneDisplay: profile.allowPhoneDisplay || false,
-                      allowWhatsApp: profile.allowWhatsApp || false,
-                    });
-                  }}
-                  className="bg-muted text-muted-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-muted/80 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-primary text-primary-foreground px-5 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card flex items-center gap-2 disabled:opacity-50"
-                >
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                  {saving ? "Saving..." : "Save"}
-                </button>
+          </form>
+
+          {profile.hasPassword === false ? (
+            <Card icon={KeyRound} title="Password" description="Your account signs in with Auth0.">
+              <p className="text-sm text-slate-text">There&apos;s no CarHat password to change. To reset it, use &ldquo;Forgot password&rdquo; on the Auth0 sign-in screen.</p>
+            </Card>
+          ) : <form onSubmit={changePassword}>
+            <Card icon={KeyRound} title="Password" description="Use at least 8 characters.">
+              <div className="grid gap-5 md:grid-cols-3">
+                <Field id="pw-current" label="Current password"><input id="pw-current" type="password" className="field" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} autoComplete="current-password" required /></Field>
+                <Field id="pw-new" label="New password"><input id="pw-new" type="password" className="field" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} autoComplete="new-password" minLength={8} required /></Field>
+                <Field id="pw-confirm" label="Repeat new password"><input id="pw-confirm" type="password" className="field" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} autoComplete="new-password" required /></Field>
               </div>
-            )}
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+                {pwMessage && <Alert tone={pwMessage.tone} className="grow">{pwMessage.text}</Alert>}
+                <Button type="submit" variant="secondary" disabled={pwSaving || !pw.current || !pw.next}>
+                  {pwSaving && <Loader2 size={16} className="animate-spin" aria-hidden />} Change password
+                </Button>
+              </div>
+            </Card>
+          </form>}
+        </div>
+
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-3xl border border-hairline bg-white p-6 text-center shadow-soft">
+            <UserAvatar src={profile.avatar} name={profile.name} className="rounded-3xl text-3xl shadow-glow" />
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-lg font-extrabold">
+              {isDealer && profile.dealershipName ? profile.dealershipName : profile.name}
+              {profile.isVerified && <BadgeCheck size={18} className="text-electric" aria-label="Verified" />}
+            </p>
+            <p className="text-sm capitalize text-slate-text">{profile.role} account</p>
+            <dl className="mt-5 space-y-2.5 border-t border-hairline pt-5 text-left text-sm">
+              <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-text">Phone</dt><dd className="font-semibold tabular">{normalisePhoneNumber(profile.phone) ? formatPhoneNumber(profile.phone) : <a href="#contact-details" className="text-electric">Add</a>}</dd></div>
+              <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-text">WhatsApp</dt><dd className="font-semibold tabular">{normalisePhoneNumber(profile.whatsappNumber) ? (usesPhoneForWhatsApp(profile) ? "Same as phone" : formatPhoneNumber(profile.whatsappNumber)) : <a href="#contact-details" className="text-electric">Add</a>}</dd></div>
+              <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-text">Buyers see</dt><dd className="font-semibold">{[profile.allowPhoneDisplay !== false && normalisePhoneNumber(profile.phone) && "Phone", profile.allowWhatsApp !== false && normalisePhoneNumber(profile.whatsappNumber) && "WhatsApp", "Chat"].filter(Boolean).join(", ")}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-slate-text">Member since</dt><dd className="font-semibold">{new Date(profile.createdAt).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-slate-text">Verification</dt><dd className={cn("font-semibold", profile.isVerified ? "text-verified" : "text-warning")}>{profile.isVerified ? "Verified" : "Not yet"}</dd></div>
+            </dl>
           </div>
+          <div className="rounded-3xl border border-hairline bg-mist p-6 text-sm text-slate-text">
+            <CalendarDays size={20} className="text-electric" aria-hidden />
+            <p className="mt-3"><strong className="text-night">Want the verified tick?</strong> Complete your profile and post a car with its papers. Our team verifies active sellers and dealers.</p>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+function Card({ id, icon: Icon, title, description, children }: { id?: string; icon: typeof Phone; title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="scroll-mt-24 rounded-3xl border border-hairline bg-white p-6 shadow-soft md:p-7">
+      <div className="mb-6 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-haze text-electric"><Icon size={19} aria-hidden /></span>
+        <div>
+          <h2 className="text-lg font-extrabold">{title}</h2>
+          {description && <p className="text-sm text-slate-text">{description}</p>}
         </div>
       </div>
+      {children}
+    </section>
+  );
+}
 
-      {error && (
-        <div className="bg-destructive/10 text-destructive text-sm p-4 rounded-xl mb-6 border border-destructive/20 flex items-center gap-2">
-          <XCircle size={16} />
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="bg-green-500/10 text-verified text-sm p-4 rounded-xl mb-6 border border-green-500/20 flex items-center gap-2">
-          <CheckCircle2 size={16} />
-          {success}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Personal Information */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-              <UserIcon size={18} className="text-primary" />
-              Personal Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">Phone Number</label>
-                {editing ? (
-                  <div className="flex">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border bg-muted text-muted-foreground text-sm font-medium">
-                      +880
-                    </span>
-                    <input
-                      type="tel"
-                      value={form.phone.replace(/^\+880\s*/, '')}
-                      onChange={(e) => setForm({ ...form, phone: "+880" + e.target.value.replace(/^\+880\s*/, '') })}
-                      placeholder="1X XX-XXXXXX"
-                      className="w-full px-3 py-2 bg-background border border-border rounded-r-lg focus:ring-2 focus:ring-primary outline-none"
-                    />
-                  </div>
-                ) : (
-                  <p className="flex items-center gap-2">
-                    <Phone size={14} className="text-muted-foreground" />
-                    {profile.phone || <span className="text-muted-foreground italic">Not set</span>}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">City</label>
-                {editing ? (
-                  <input
-                    type="text"
-                    value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    placeholder="e.g. Dhaka"
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                ) : (
-                  <p className="flex items-center gap-2">
-                    <MapPin size={14} className="text-muted-foreground" />
-                    {profile.city || <span className="text-muted-foreground italic">Not set</span>}
-                  </p>
-                )}
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">Address</label>
-                {editing ? (
-                  <input
-                    type="text"
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="e.g. 123 Gulshan Avenue"
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                ) : (
-                  <p className="flex items-center gap-2">
-                    <MapPin size={14} className="text-muted-foreground" />
-                    {profile.address || <span className="text-muted-foreground italic">Not set</span>}
-                  </p>
-                )}
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">Bio</label>
-                {editing ? (
-                  <textarea
-                    value={form.bio}
-                    onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                    placeholder="Tell us about yourself..."
-                    rows={3}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none"
-                  />
-                ) : (
-                  <p className="text-sm">
-                    {profile.bio || <span className="text-muted-foreground italic">No bio added yet</span>}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Dealer Information */}
-          {isDealer && (
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-                <Store size={18} className="text-teal-ink" />
-                Dealership Information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Dealership Name</label>
-                  {editing ? (
-                    <input
-                      type="text"
-                      value={form.dealershipName}
-                      onChange={(e) => setForm({ ...form, dealershipName: e.target.value })}
-                      placeholder="e.g. Dhaka Car Hub"
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    />
-                  ) : (
-                    <p className="flex items-center gap-2">
-                      <Building2 size={14} className="text-muted-foreground" />
-                      {profile.dealershipName || <span className="text-muted-foreground italic">Not set</span>}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">License Number</label>
-                  {editing ? (
-                    <input
-                      type="text"
-                      value={form.dealershipLicense}
-                      onChange={(e) => setForm({ ...form, dealershipLicense: e.target.value })}
-                      placeholder="e.g. DLS-2024-0042"
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    />
-                  ) : (
-                    <p className="flex items-center gap-2">
-                      <FileText size={14} className="text-muted-foreground" />
-                      {profile.dealershipLicense || <span className="text-muted-foreground italic">Not set</span>}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Contact & Visibility Settings */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-              <Phone size={18} className="text-verified" />
-              Contact & Visibility Settings
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">WhatsApp Number</label>
-                {editing ? (
-                  <div className="flex w-full md:w-1/2">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border bg-muted text-muted-foreground text-sm font-medium">
-                      +880
-                    </span>
-                    <input
-                      type="tel"
-                      value={form.whatsappNumber.replace(/^\+880\s*/, '')}
-                      onChange={(e) => setForm({ ...form, whatsappNumber: "+880" + e.target.value.replace(/^\+880\s*/, '') })}
-                      placeholder="1X XX-XXXXXX"
-                      className="w-full px-3 py-2 bg-background border border-border rounded-r-lg focus:ring-2 focus:ring-primary outline-none"
-                    />
-                  </div>
-                ) : (
-                  <p className="flex items-center gap-2">
-                    <Phone size={14} className="text-muted-foreground" />
-                    {profile.whatsappNumber || <span className="text-muted-foreground italic">Not set</span>}
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex items-center justify-between py-2 border-t border-border mt-4">
-                <div>
-                  <h3 className="font-medium text-sm">Show Phone Number</h3>
-                  <p className="text-xs text-muted-foreground">Allow buyers to see your phone number on listings</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    disabled={!editing}
-                    checked={editing ? form.allowPhoneDisplay : (profile.allowPhoneDisplay || false)}
-                    onChange={(e) => setForm({ ...form, allowPhoneDisplay: e.target.checked })}
-                  />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary opacity-80 peer-disabled:opacity-50"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between py-2 border-t border-border">
-                <div>
-                  <h3 className="font-medium text-sm">Enable WhatsApp Contact</h3>
-                  <p className="text-xs text-muted-foreground">Show WhatsApp button on your listings</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    disabled={!editing}
-                    checked={editing ? form.allowWhatsApp : (profile.allowWhatsApp || false)}
-                    onChange={(e) => setForm({ ...form, allowWhatsApp: e.target.checked })}
-                  />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary opacity-80 peer-disabled:opacity-50"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Change Password */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-border pb-3">
-              <Key size={18} className="text-primary" />
-              Change Password
-            </h2>
-            {passwordError && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg mb-4 border border-destructive/20 flex items-center gap-2">
-                <XCircle size={14} />
-                {passwordError}
-              </div>
-            )}
-            {passwordSuccess && (
-              <div className="bg-green-500/10 text-verified text-sm p-3 rounded-lg mb-4 border border-green-500/20 flex items-center gap-2">
-                <CheckCircle2 size={14} />
-                {passwordSuccess}
-              </div>
-            )}
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Current Password</label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  placeholder="Enter current password"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">New Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="Min. 6 characters"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Confirm New Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                    placeholder="Re-enter new password"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors shadow-card flex items-center gap-2 disabled:opacity-50"
-              >
-                {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Key size={16} />}
-                {changingPassword ? "Changing..." : "Change Password"}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Account Info */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-sm mb-4 flex items-center gap-2 border-b border-border pb-3 uppercase tracking-wider text-muted-foreground">
-              <Shield size={16} className="text-primary" />
-              Account Info
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Member since</span>
-                <span className="font-medium">
-                  {new Date(profile.createdAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Role</span>
-                <span className="font-medium capitalize">{profile.role}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Verification</span>
-                <span className={`font-medium ${profile.isVerified ? "text-verified" : "text-[#7a5200]"}`}>
-                  {profile.isVerified ? "Verified" : "Pending"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold text-sm mb-4 flex items-center gap-2 border-b border-border pb-3 uppercase tracking-wider text-muted-foreground">
-              Quick Links
-            </h2>
-            <div className="space-y-2">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-sm font-medium"
-              >
-                <UserIcon size={16} className="text-primary" />
-                My Dashboard
-              </Link>
-              <Link
-                href="/sell"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-sm font-medium"
-              >
-                <Building2 size={16} className="text-primary" />
-                Post an Ad
-              </Link>
-              <Link
-                href="/cars"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-sm font-medium"
-              >
-                <MapPin size={16} className="text-primary" />
-                Browse Cars
-              </Link>
-            </div>
-          </div>
-
-          {/* Role Badge */}
-          <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              {isDealer ? (
-                <Store size={20} className="text-teal-ink" />
-              ) : (
-                <UserIcon size={20} className="text-primary" />
-              )}
-              <h3 className="font-bold capitalize">{profile.role} Account</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {isDealer
-                ? "You have access to dealer features including bulk uploads and analytics."
-                : profile.role === "seller"
-                ? "You can list and manage your car ads with ease."
-                : profile.role === "admin"
-                ? "You have full access to the admin panel."
-                : "Browse and discover the best cars in Bangladesh."}
-            </p>
-          </div>
-        </div>
-      </div>
+function Field({ id, label, className, children }: { id: string; label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={className}>
+      <label htmlFor={id} className="field-label">{label}</label>
+      {children}
     </div>
+  );
+}
+
+function Toggle({ icon: Icon, label, hint, checked, disabled, onChange }: { icon: typeof Phone; label: string; hint: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-mist/60 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent">
+      <Icon size={18} className="shrink-0 text-electric" aria-hidden />
+      <span className="grow">
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block text-[13px] text-slate-text">{hint}</span>
+      </span>
+      <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition-colors", checked ? "bg-electric" : "bg-[#cbd5e1]")}>
+        <span className={cn("absolute left-1 top-1 size-4 rounded-full bg-white shadow transition-transform", checked && "translate-x-4")} />
+      </span>
+    </button>
   );
 }

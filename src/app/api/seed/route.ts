@@ -37,7 +37,7 @@ const DEMO_CARS = [
     color: "Rallye Red",
     location: "Banani, Dhaka",
     description: "Honda Civic RS Turbo with full VTEC performance. Upgraded exhaust, leather seats, ambient lighting, Honda Sensing suite. Maintained at authorized dealer only.",
-    images: ["https://images.unsplash.com/photo-1606611013016-969c19ba27e5?auto=format&fit=crop&q=80&w=1200"],
+    images: ["https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200"],
     views: 518,
     features: ["Honda Sensing", "Leather Seats", "Turbo Engine", "Apple CarPlay", "Android Auto"],
   },
@@ -88,7 +88,7 @@ const DEMO_CARS = [
     color: "Phantom Black",
     location: "Uttara, Dhaka",
     description: "Almost brand new Hyundai Tucson N-Line with sport-tuned suspension. Bose premium audio, ventilated seats, blind spot collision avoidance, remote smart parking. Still under full warranty.",
-    images: ["https://images.unsplash.com/photo-1644438667516-8d4d90078d76?auto=format&fit=crop&q=80&w=1200"],
+    images: ["https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200"],
     views: 234,
     features: ["N-Line Sport", "Bose Audio", "Ventilated Seats", "Blind Spot Warning", "Remote Parking"],
   },
@@ -122,7 +122,7 @@ const DEMO_CARS = [
     color: "Super White",
     location: "Gulshan, Dhaka",
     description: "Toyota Land Cruiser Prado TX-L with Diesel engine. 7-seater, Crawl Control, Multi-Terrain Select, Kinetic Dynamic Suspension, full leather interior, sunroof. Ultimate off-road luxury.",
-    images: ["https://images.unsplash.com/photo-1594611020663-4821e532e528?auto=format&fit=crop&q=80&w=1200"],
+    images: ["https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=1200"],
     views: 1250,
     features: ["7 Seats", "Crawl Control", "Multi-Terrain Select", "Sunroof", "4WD"],
   },
@@ -156,7 +156,7 @@ const DEMO_CARS = [
     color: "Jet Black Mica",
     location: "Chittagong",
     description: "Mitsubishi Pajero Sport GT Premium 4WD. Super Select II 4WD, 8-speed automatic, Rockford Fosgate audio, 8 airbags, 360-degree camera. Perfect for highway and off-road.",
-    images: ["https://images.unsplash.com/photo-1625231334168-24ed46e8a9a2?auto=format&fit=crop&q=80&w=1200"],
+    images: ["https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=1200"],
     views: 389,
     features: ["4WD Super Select II", "Rockford Fosgate Audio", "8 Airbags", "360 Camera", "Paddle Shifters"],
   },
@@ -355,10 +355,9 @@ export async function GET() {
   if (process.env.ALLOW_SEED !== "true") {
     return NextResponse.json({ error: "Seeding is disabled. Set ALLOW_SEED=true to enable it." }, { status: 404 });
   }
-  if (process.env.NODE_ENV === "production") {
-    const auth = await requireAdmin();
-    if (!auth.ok) return auth.response;
-  }
+  // Always admin-only: a local .env can point at the live database.
+  const auth = await requireAdmin("settings.manage");
+  if (!auth.ok) return auth.response;
   try {
     await connectToDatabase();
 
@@ -455,7 +454,7 @@ export async function GET() {
     await SiteSettings.create({
       siteName: "CarHat.bd",
       tagline: "The premier destination to buy, sell, and explore the best cars in Bangladesh.",
-      contactEmail: "support@carhat.bd",
+      contactEmail: "carhatbd@gmail.com",
       supportPhone: "+880 1700-000000",
       address: "Plot 12, Road 11, Block C, Gulshan-2, Dhaka 1212, Bangladesh",
       workingHours: "Sat - Thu: 9:00 AM - 8:00 PM (Friday Closed)",

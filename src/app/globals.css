@@ -5,57 +5,66 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * CarHat design tokens
- * Palette comes from the logo: a teal → cobalt gradient.
- * Contrast (WCAG): ink/paper 16:1, primary/white 7.8:1, muted text/white 7:1,
- * teal-ink/white 5.6:1. Plain teal (#1FB3C4) is 2.5:1 — decoration only, never text.
+ * CarHat design system, taken from the logo: teal #22b4c4 → ocean #0e6aa8 → navy #0a4898, set in Plus Jakarta Sans.
+ * Contrast (WCAG, on white): night 16.4:1, slate-text 7.6:1, electric #0e6aa8 5.8:1 and electric-deep #0a4898 8.8:1
+ * (safe for text), electric-light #1898b8 3.4:1 and teal #22b4c4 2.5:1 (icons, large type and gradients only),
+ * verified 5.6:1, warning 5:1.
  */
 @theme {
-  /* Archivo has no Bengali glyphs, so ৳ falls through to the next font. Bengali fonts go before
+  /* Plus Jakarta has no Bengali glyphs, so ৳ falls through to the next font. Bengali fonts go before
      system-ui because Segoe UI ships a tiny, hard-to-read ৳. */
-  --font-sans: var(--font-archivo), "Nirmala UI", "Noto Sans Bengali", "Kohinoor Bangla", "Bangla Sangam MN",
+  --font-sans: var(--font-jakarta), "Nirmala UI", "Noto Sans Bengali", "Kohinoor Bangla", "Bangla Sangam MN",
     ui-sans-serif, system-ui, "Segoe UI", sans-serif;
 
-  --color-background: #f4f7fa;
-  --color-foreground: #0c1b2e;
+  --color-background: #f7f9fc;
+  --color-foreground: #0b1d36;
   --color-card: #ffffff;
-  --color-card-foreground: #0c1b2e;
+  --color-card-foreground: #0b1d36;
   --color-popover: #ffffff;
-  --color-popover-foreground: #0c1b2e;
+  --color-popover-foreground: #0b1d36;
 
-  --color-primary: #0b4fa8;
+  --color-primary: #0e6aa8;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #e6edf5;
-  --color-secondary-foreground: #0c1b2e;
-  --color-muted: #edf1f6;
-  --color-muted-foreground: #4a5a6e;
-  --color-accent: #e2f4f6;
-  --color-accent-foreground: #0b5f6e;
-  --color-destructive: #c62828;
+  --color-secondary: #eef2f7;
+  --color-secondary-foreground: #0b1d36;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #475569;
+  --color-accent: #e3f2f8;
+  --color-accent-foreground: #0a4898;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
 
-  --color-border: #d5dee8;
-  --color-input: #7f91a6;
-  --color-ring: #0b4fa8;
+  --color-border: #e5e7eb;
+  /* Form control outlines need 3:1 against white. */
+  --color-input: #8492a6;
+  --color-ring: #0e6aa8;
 
-  /* Brand extensions */
-  --color-teal: #1fb3c4;
-  --color-teal-ink: #0b7285;
-  --color-teal-soft: #8fe3ec;
-  --color-ink: #082f66;
-  --color-ink-deep: #061f45;
-  --color-marigold: #f4b41a;
+  --color-electric: #0e6aa8;
+  --color-electric-deep: #0a4898;
+  --color-electric-light: #1898b8;
+  --color-teal: #22b4c4;
+  --color-mist: #f3f9fc;
+  --color-haze: #e3f2f8;
+  --color-night: #0b1d36;
+  --color-slate-text: #475569;
+  --color-hairline: #e5e7eb;
+
   --color-verified: #0f7b4f;
+  --color-verified-soft: #e7f6ee;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-danger-soft: #fdecec;
+
+  --shadow-soft: 0 1px 2px rgb(11 29 54 / 0.04), 0 8px 24px -12px rgb(11 29 54 / 0.12);
+  --shadow-float: 0 2px 6px rgb(11 29 54 / 0.04), 0 24px 48px -20px rgb(10 72 152 / 0.28);
+  --shadow-glow: 0 10px 30px -10px rgb(14 106 168 / 0.55);
+  --shadow-pop: 0 24px 64px -16px rgb(11 29 54 / 0.35);
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
-
-  --shadow-card: 0 1px 2px rgb(8 47 102 / 0.06), 0 1px 1px rgb(8 47 102 / 0.04);
-  --shadow-lift: 0 2px 4px rgb(8 47 102 / 0.06), 0 12px 32px -8px rgb(8 47 102 / 0.18);
-  --shadow-pop: 0 24px 64px -16px rgb(6 31 69 / 0.35);
 
   --animate-rise: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -71,20 +80,23 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    scroll-padding-top: 80px;
+  }
+  @media (min-width: 1024px) {
+    html { scroll-padding-top: 96px; }
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01" on;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4 {
     text-wrap: balance;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.03em;
   }
 
   p {
@@ -92,17 +104,13 @@
   }
 
   ::selection {
-    background: rgb(31 179 196 / 0.28);
+    background: rgb(34 180 196 / 0.22);
   }
 
   /* One visible focus style everywhere; mouse clicks don't trigger it. */
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
-  }
-  .on-ink :focus-visible,
-  .on-ink:focus-visible {
-    outline-color: var(--color-teal-soft);
   }
 
   button:not(:disabled),
@@ -116,103 +124,265 @@
   }
 }
 
-/* ─── Type ─────────────────────────────────────────── */
-/* Archivo's width axis carries the voice: wide + heavy for headlines and prices,
-   like the lettering on number plates and car badging. */
-.font-wide {
-  font-stretch: 125%;
-}
-.font-semiwide {
-  font-stretch: 112%;
-}
-.font-narrow {
-  font-stretch: 85%;
-}
-
-.display {
-  font-stretch: 125%;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 0.98;
-}
-
-.price-tag,
-.price-display {
-  font-stretch: 118%;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums lining-nums;
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums lining-nums;
-}
-
-/* ─── Brand surfaces ───────────────────────────────── */
-/* The logo gradient, deepened so white text stays above 7:1 across the text area. */
-.bg-brand-ink {
-  background-color: var(--color-ink);
-  background-image:
-    radial-gradient(120% 90% at 100% 100%, rgb(31 179 196 / 0.42) 0%, transparent 55%),
-    radial-gradient(80% 60% at 0% 0%, rgb(11 79 168 / 0.55) 0%, transparent 60%),
-    linear-gradient(160deg, #0a3a7d 0%, var(--color-ink) 45%, var(--color-ink-deep) 100%);
-}
-
-.bg-brand-gradient {
-  background-image: linear-gradient(100deg, #0b4fa8 0%, #0a64b8 55%, #0b7f9c 100%);
-}
-
-.text-brand-gradient {
-  background: linear-gradient(95deg, #1fb3c4 0%, #0b4fa8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Kept for pages that still reference it (footer/navbar fallbacks, blog). */
-.gradient-text {
-  background: linear-gradient(95deg, #0b7285 0%, #0b4fa8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* ─── Cards ────────────────────────────────────────── */
-.card-hover {
-  transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
-}
-@media (hover: hover) {
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lift);
-    border-color: rgb(11 79 168 / 0.28);
+@layer components {
+  /* ─── Type ─────────────────────────────────────────── */
+  .price-tag {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums lining-nums;
   }
-}
 
-/* ─── Condition badges ─────────────────────────────── */
-.badge-new {
-  background-color: #e3f5ec;
-  color: #0b6b43;
-  border: 1px solid #b5e2cb;
-}
-.badge-used {
-  background-color: #e6eefa;
-  color: #0b4fa8;
-  border: 1px solid #bcd0ee;
-}
-.badge-reconditioned {
-  background-color: #fdf3dc;
-  color: #7a5200;
-  border: 1px solid #f1d898;
-}
+  .tabular {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
 
-/* ─── Glass (hero search) ──────────────────────────── */
-.glass,
-.glass-panel {
-  background-color: rgb(255 255 255 / 0.1);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgb(255 255 255 / 0.18);
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--color-electric);
+  }
+
+  .text-gradient-electric {
+    background: linear-gradient(100deg, var(--color-electric-light) 0%, var(--color-electric) 45%, var(--color-electric-deep) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* The logo's own sweep, ocean to navy. Starts at #127fa8 so white text keeps 4.5:1 across the whole fill;
+     hover slides the gradient toward navy rather than swapping colours. */
+  .bg-brand {
+    background-image: linear-gradient(120deg, #127fa8 0%, #0e6aa8 40%, #0a4898 75%, #083c80 100%);
+    background-size: 160% 100%;
+    background-position: 0% 50%;
+    transition: background-position 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s, transform 0.2s;
+  }
+  .bg-brand:hover {
+    background-position: 100% 50%;
+  }
+
+  /* ─── Surfaces ─────────────────────────────────────── */
+  .hero-backdrop {
+    background:
+      radial-gradient(60% 70% at 85% 30%, rgb(34 180 196 / 0.16), transparent 70%),
+      radial-gradient(40% 50% at 10% 10%, rgb(10 72 152 / 0.08), transparent 70%),
+      linear-gradient(180deg, #ffffff 0%, var(--color-mist) 100%);
+  }
+  .hero-grid {
+    background-image:
+      linear-gradient(rgb(14 106 168 / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(14 106 168 / 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(70% 60% at 60% 40%, black, transparent);
+  }
+
+  /* ─── Form controls ────────────────────────────────── */
+  /* `.field` is every text input, select and textarea; `.search-input` is the taller homepage search. */
+  .field,
+  .search-input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--color-hairline);
+    background: #fff;
+    color: var(--color-night);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field {
+    height: 48px;
+    border-radius: 14px;
+    padding-inline: 14px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  textarea.field {
+    height: auto;
+    min-height: 120px;
+    padding-block: 12px;
+    line-height: 1.55;
+  }
+  .search-input {
+    height: 52px;
+    border-radius: 16px;
+    padding-inline: 14px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .field::placeholder,
+  .search-input::placeholder {
+    font-weight: 500;
+    color: rgb(71 85 105 / 0.7);
+  }
+  .field:hover,
+  .search-input:hover {
+    border-color: #b8dceb;
+  }
+  .field:focus,
+  .search-input:focus {
+    outline: none;
+    border-color: var(--color-electric);
+    box-shadow: 0 0 0 4px rgb(14 106 168 / 0.14);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-destructive);
+  }
+  .field:disabled {
+    background: var(--color-muted);
+    color: var(--color-slate-text);
+  }
+  .field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-night);
+  }
+
+  /* ─── Navigation ───────────────────────────────────── */
+  .nav-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding-inline: 12px;
+    font-size: 14px;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--color-slate-text);
+    transition: color 0.2s;
+  }
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    inset-inline: 12px;
+    bottom: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-electric);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nav-link:hover,
+  .nav-link[aria-current="page"] {
+    color: var(--color-night);
+  }
+  .nav-link:hover::after,
+  .nav-link[aria-current="page"]::after {
+    transform: scaleX(1);
+  }
+  /* The one-line header is tightest between lg and xl. */
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .nav-link { padding-inline: 7px; font-size: 13.5px; }
+    .nav-link::after { inset-inline: 7px; }
+  }
+  /* The header bar never grows past ~1240px, so wide screens get the same tight spacing. */
+  @media (min-width: 1280px) {
+    .nav-link { padding-inline: 10px; }
+    .nav-link::after { inset-inline: 10px; }
+  }
+
+  .drawer-link {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--color-night);
+  }
+  .drawer-link:hover,
+  .drawer-link[aria-current="page"] {
+    background: var(--color-mist);
+  }
+
+  .bottom-tab {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 60px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-slate-text);
+  }
+  .bottom-tab[aria-current="page"] {
+    color: var(--color-electric);
+  }
+
+  /* Swipeable rails on phones; grids from the breakpoint each section chooses. */
+  .snap-rail {
+    position: relative;
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin-inline: -16px;
+    padding: 4px 16px 20px;
+    scroll-padding-inline: 16px;
+  }
+  .snap-rail::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-rail > * {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  /* ─── Long-form text (blog, legal pages) ───────────── */
+  .prose-car {
+    font-size: 17px;
+    line-height: 1.75;
+    color: #1b2a41;
+  }
+  .prose-car > * + * {
+    margin-top: 1.1em;
+  }
+  .prose-car h2 {
+    margin-top: 2em;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--color-night);
+  }
+  .prose-car h3 {
+    margin-top: 1.6em;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-night);
+  }
+  .prose-car a {
+    font-weight: 600;
+    color: var(--color-electric);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .prose-car ul,
+  .prose-car ol {
+    padding-left: 1.4em;
+  }
+  .prose-car ul { list-style: disc; }
+  .prose-car ol { list-style: decimal; }
+  .prose-car li + li { margin-top: 0.4em; }
+  .prose-car li::marker { color: var(--color-electric); }
+  .prose-car strong { color: var(--color-night); }
+  .prose-car blockquote {
+    border-left: 3px solid var(--color-electric);
+    padding-left: 1em;
+    color: var(--color-slate-text);
+  }
+  .prose-car img {
+    border-radius: 1rem;
+  }
 }
 
 /* ─── Motion ───────────────────────────────────────── */
@@ -241,7 +411,6 @@
   100% { background-position: -100% 0; }
 }
 
-/* Replaces the tailwindcss-animate classes some pages used without the plugin installed. */
 .animate-in {
   animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -259,14 +428,9 @@
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--color-muted) 25%, #f7f9fc 50%, var(--color-muted) 75%);
+  background: linear-gradient(90deg, var(--color-muted) 25%, #f8fafc 50%, var(--color-muted) 75%);
   background-size: 200% 100%;
   animation: skeleton 1.4s ease-in-out infinite;
-}
-
-/* The hero's single orchestrated moment: listings slide onto the board one after another. */
-.board-row {
-  animation: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -278,6 +442,218 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ─── Text effects (after text-effects.colorion.co) ─── */
+/* Every stop keeps ≥ 3:1 on white, so the gradient stays legible as large text at any frame. */
+
+/* "Borealis": a slow aurora drifting through the letters. */
+.text-aurora {
+  background: linear-gradient(110deg, #0a4898 0%, #0e6aa8 22%, #1898b8 42%, #0b5596 64%, #0e6aa8 82%, #0a4898 100%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: aurora 9s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+/* "Ghostwrite": a light sweep across the text, for small live labels. */
+.text-shimmer {
+  --shimmer-ink: var(--color-electric-deep);
+  background: linear-gradient(90deg, var(--shimmer-ink) 0%, var(--shimmer-ink) 40%, #7fd3df 50%, var(--shimmer-ink) 60%, var(--shimmer-ink) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 3.2s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+
+/* "Rotator": words roll up one after another. Five words; the first repeats at the end to loop. */
+.word-rotator {
+  display: inline-flex;
+  height: 1.12em;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.word-rotator > span {
+  display: flex;
+  flex-direction: column;
+  /* The hero sets these for its own word count; reduced motion still switches the animation off. */
+  animation: var(--roll-name, word-roll) var(--roll-duration, 12.5s) cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+.word-rotator > span > span {
+  display: block;
+  height: 1.12em;
+  line-height: 1.12em;
+  white-space: nowrap;
+}
+@keyframes word-roll {
+  0%, 16% { transform: translateY(0); }
+  20%, 36% { transform: translateY(-1.12em); }
+  40%, 56% { transform: translateY(-2.24em); }
+  60%, 76% { transform: translateY(-3.36em); }
+  80%, 96% { transform: translateY(-4.48em); }
+  100% { transform: translateY(-5.6em); }
+}
+
+/* "Hi-Liter": a marker stroke drawn under the words as they scroll into view. */
+.text-highlight {
+  background: linear-gradient(transparent 62%, rgb(34 180 196 / 0.24) 62%, rgb(34 180 196 / 0.24) 92%, transparent 92%) no-repeat;
+  background-size: 100% 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@supports (animation-timeline: view()) {
+  .text-highlight {
+    background-size: 0% 100%;
+    animation: highlight linear both;
+    animation-timeline: view();
+    animation-range: entry 30% cover 30%;
+  }
+}
+@keyframes highlight {
+  to { background-size: 100% 100%; }
+}
+
+/* "Loader": letters bob in sequence. Each letter carries --i. */
+.text-wave > span {
+  display: inline-block;
+  animation: wave 1.3s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.08s);
+}
+@keyframes wave {
+  0%, 60%, 100% { transform: none; }
+  30% { transform: translateY(-5px); }
+}
+
+/* ─── UI effects (after uiverse.io) ────────────────── */
+
+/* Light sweep across a button on hover. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.4) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.btn-shine:hover::after,
+.btn-shine:focus-visible::after {
+  transform: translateX(120%);
+}
+
+/* A beam of light travelling around a card's border. */
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.border-beam {
+  position: relative;
+  isolation: isolate;
+}
+.border-beam::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--beam-angle), transparent 0deg 250deg, rgb(34 180 196 / 0.95) 300deg, #0e6aa8 340deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: beam 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes beam {
+  to { --beam-angle: 360deg; }
+}
+
+/* Endless vertical feed; the list is rendered twice and slides by exactly one copy. */
+.ticker-y {
+  animation: ticker-y var(--ticker-duration, 40s) linear infinite;
+}
+.ticker-paused .ticker-y,
+.ticker-wrap:hover .ticker-y,
+.ticker-wrap:focus-within .ticker-y {
+  animation-play-state: paused;
+}
+@keyframes ticker-y {
+  to { transform: translateY(-50%); }
+}
+
+/* Brand spinner: the ring turns while its arc grows and shrinks (one stroke, one transform, GPU-cheap). */
+.spinner-rotate {
+  transform-origin: center;
+  animation: spinner-rotate 1.6s linear infinite;
+}
+.spinner-arc {
+  stroke-dasharray: 1 200;
+  stroke-dashoffset: 0;
+  animation: spinner-dash 1.6s ease-in-out infinite;
+}
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+@keyframes spinner-dash {
+  0% { stroke-dasharray: 1 200; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90 200; stroke-dashoffset: -32; }
+  100% { stroke-dasharray: 90 200; stroke-dashoffset: -124; }
+}
+/* Soft halo breathing behind the spinner. */
+.spinner-halo {
+  animation: spinner-halo 2.4s ease-in-out infinite;
+}
+@keyframes spinner-halo {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 0.7; transform: scale(1.06); }
+}
+
+/* Indeterminate bar: a logo-gradient segment that sweeps across, speeding up mid-track. */
+.loader-track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-haze);
+}
+.loader-track > span {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 45%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-teal), var(--color-electric) 55%, var(--color-electric-deep));
+  animation: loader-sweep 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes loader-sweep {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(240%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-dup { display: none; }
+  .ticker-wrap { overflow-y: auto; }
+  .word-rotator > span { animation: none; }
+  /* A frozen spinner reads as broken, so loading indicators keep turning, just slower. */
+  .spinner-rotate { animation-duration: 3s !important; animation-iteration-count: infinite !important; }
+  .loader-track > span { animation-duration: 3s !important; animation-iteration-count: infinite !important; }
 }
 
 /* ─── Utilities ────────────────────────────────────── */
@@ -302,12 +678,12 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(74 90 110 / 0.35);
+  background: rgb(71 85 105 / 0.3);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(74 90 110 / 0.55);
+  background: rgb(71 85 105 / 0.5);
   background-clip: content-box;
 }

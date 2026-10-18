@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 /* ─── Buttons ─────────────────────────────────────── */
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-primary text-white hover:bg-[#0a4594]",
-  secondary: "border border-input bg-card text-foreground hover:bg-muted",
-  ghost: "text-foreground/80 hover:bg-muted hover:text-foreground",
-  danger: "bg-destructive text-white hover:bg-[#a82020]",
+  primary: "bg-electric text-white shadow-glow hover:bg-electric-deep",
+  secondary: "border border-hairline bg-white text-night shadow-soft hover:border-[#b8dceb] hover:bg-mist",
+  ghost: "text-slate-text hover:bg-mist hover:text-night",
+  danger: "bg-destructive text-white hover:bg-[#b91c1c]",
   success: "bg-verified text-white hover:bg-[#0c6942]",
 };
 
@@ -27,8 +27,8 @@ export function Button({
       {...props}
       disabled={props.disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55",
-        size === "sm" ? "h-8 px-3 text-sm" : "h-10 px-4 text-[15px]",
+        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-semibold transition-[background-color,color,box-shadow,border-color] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98] motion-reduce:active:scale-100",
+        size === "sm" ? "h-9 rounded-lg px-3 text-[13px]" : "h-10 rounded-xl px-4 text-sm",
         VARIANT[variant],
         className
       )}
@@ -42,10 +42,10 @@ export function Button({
 /* ─── Status badges ───────────────────────────────── */
 // Status reads by label + dot, never colour alone.
 const STATUS: Record<string, { label: string; cls: string; dot: string }> = {
-  active: { label: "Live", cls: "bg-[#e3f5ec] text-[#0b6b43]", dot: "bg-[#12925a]" },
-  pending: { label: "Pending review", cls: "bg-[#fdf3dc] text-[#7a5200]", dot: "bg-[#d99a06]" },
-  sold: { label: "Sold", cls: "bg-[#e6eefa] text-primary", dot: "bg-primary" },
-  removed: { label: "Removed", cls: "bg-[#fde8e8] text-[#a11d1d]", dot: "bg-destructive" },
+  active: { label: "Live", cls: "bg-verified-soft text-verified", dot: "bg-verified" },
+  pending: { label: "Pending review", cls: "bg-warning-soft text-warning", dot: "bg-[#d97706]" },
+  sold: { label: "Sold", cls: "bg-haze text-electric-deep", dot: "bg-electric" },
+  removed: { label: "Removed", cls: "bg-danger-soft text-destructive", dot: "bg-destructive" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -65,8 +65,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="font-semiwide text-2xl font-extrabold md:text-[1.75rem]">{title}</h1>
-        {description && <p className="mt-1 text-muted-foreground">{description}</p>}
+        <h1 className="text-2xl font-extrabold text-night md:text-[1.9rem]">{title}</h1>
+        {description && <p className="mt-1 text-[15px] text-slate-text">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -86,7 +86,7 @@ export function CountTabs<T extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1">
+    <div role="tablist" aria-label={label} className="scrollbar-none flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl bg-mist p-1">
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -94,13 +94,13 @@ export function CountTabs<T extends string>({
           aria-selected={value === t.value}
           onClick={() => onChange(t.value)}
           className={cn(
-            "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
-            value === t.value ? "bg-ink text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            "flex h-9 shrink-0 items-center gap-2 rounded-xl px-3 text-[13px] font-semibold transition-colors",
+            value === t.value ? "bg-white text-night shadow-soft" : "text-slate-text hover:text-night"
           )}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={cn("rounded-full px-1.5 text-xs tabular", value === t.value ? "bg-white/20" : "bg-muted")}>
+            <span className={cn("rounded-full px-1.5 text-xs tabular", value === t.value ? "bg-haze text-electric-deep" : "bg-white/70")}>
               {t.count.toLocaleString("en-IN")}
             </span>
           )}
@@ -113,7 +113,7 @@ export function CountTabs<T extends string>({
 /* ─── Pagination ──────────────────────────────────── */
 export function Pagination({ page, pages, total, onPage, noun }: { page: number; pages: number; total: number; onPage: (p: number) => void; noun: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-border px-4 py-3 text-sm">
+    <div className="flex items-center justify-between gap-4 border-t border-hairline px-4 py-3 text-sm">
       <p className="text-muted-foreground tabular">
         {total.toLocaleString("en-IN")} {noun}
         {pages > 1 && `, page ${page} of ${pages}`}
@@ -155,7 +155,7 @@ export function Checkbox({
       aria-label={label}
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="h-[18px] w-[18px] cursor-pointer rounded accent-primary"
+      className="size-[18px] cursor-pointer rounded accent-electric"
     />
   );
 }
@@ -223,25 +223,25 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="animate-fade absolute inset-0 bg-ink-deep/60" onClick={onClose} />
+      <div className="animate-fade absolute inset-0 bg-night/45 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={panelRef}
         className={cn(
-          "animate-in relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-card shadow-pop sm:rounded-2xl",
+          "animate-in relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-pop sm:rounded-3xl",
           { sm: "sm:max-w-md", md: "sm:max-w-xl", lg: "sm:max-w-3xl", xl: "sm:max-w-5xl" }[size]
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div className="min-w-0">
-            <h2 id="modal-title" className="text-lg font-bold">{title}</h2>
+            <h2 id="modal-title" className="text-lg font-extrabold">{title}</h2>
             {description && <div className="mt-0.5 text-sm text-muted-foreground">{description}</div>}
           </div>
-          <button onClick={onClose} className="-mr-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
+          <button onClick={onClose} className="-mr-2 flex size-9 items-center justify-center rounded-full text-slate-text hover:bg-mist hover:text-night" aria-label="Close">
             <X size={20} />
           </button>
         </div>
-        {children && <div className="overflow-y-auto px-5 py-5">{children}</div>}
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/60 px-5 py-3.5">{footer}</div>}
+        {children && <div className="overflow-y-auto px-6 py-5">{children}</div>}
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-hairline bg-mist/60 px-6 py-4">{footer}</div>}
       </div>
     </div>
   );
@@ -290,16 +290,70 @@ export function useConfirm() {
   return { confirm, dialog };
 }
 
+/* ─── Switch ──────────────────────────────────────── */
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-electric",
+        checked ? "bg-electric" : "bg-[#94a3b8]"
+      )}
+    >
+      <span className={cn("absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform duration-200", checked && "translate-x-5")} />
+    </button>
+  );
+}
+
+/** A labelled row with a switch on the right, for on/off settings. */
+export function SwitchRow({ title, description, checked, onChange, disabled }: {
+  title: string; description?: React.ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-mist/50 p-4">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-night">{title}</p>
+        {description && <p className="mt-0.5 text-[13px] text-slate-text">{description}</p>}
+      </div>
+      <Switch checked={checked} onChange={onChange} label={title} disabled={disabled} />
+    </div>
+  );
+}
+
+/* ─── Sticky save bar ─────────────────────────────── */
+/** Floats at the bottom while there are unsaved changes, so long forms never hide the save button. */
+export function SaveBar({ dirty, saving, onSave, onReset, message = "You have unsaved changes" }: {
+  dirty: boolean; saving: boolean; onSave: () => void; onReset?: () => void; message?: string;
+}) {
+  if (!dirty && !saving) return null;
+  return (
+    <div className="animate-in fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl bg-night p-2.5 pl-4 text-white shadow-pop" role="region" aria-label="Unsaved changes">
+      <span className="size-2 shrink-0 rounded-full bg-[#fbbf24]" aria-hidden />
+      <p className="mr-auto text-sm font-semibold">{message}</p>
+      {onReset && (
+        <button type="button" onClick={onReset} disabled={saving} className="h-9 rounded-lg px-3 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-50">
+          Discard
+        </button>
+      )}
+      <Button variant="primary" size="sm" loading={saving} onClick={onSave}>Save changes</Button>
+    </div>
+  );
+}
+
 /* ─── Misc ────────────────────────────────────────── */
-export const inputClass =
-  "h-10 w-full rounded-lg border border-input bg-card px-3 text-[15px] placeholder:text-muted-foreground";
+export const inputClass = "field h-11 text-[15px]";
 
 export function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: string; children: React.ReactNode; hint?: string }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-semibold">{label}</label>
+      <label htmlFor={htmlFor} className="field-label">{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-slate-text">{hint}</p>}
     </div>
   );
 }
@@ -313,4 +367,52 @@ export async function api<T = any>(url: string, init?: RequestInit): Promise<T> 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
   return data as T;
+}
+
+/* ─── Panel ───────────────────────────────────────── */
+export function Panel({
+  title,
+  subtitle,
+  action,
+  children,
+  className,
+  flush,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  flush?: boolean;
+}) {
+  return (
+    <section className={cn("min-w-0 rounded-3xl border border-hairline bg-white shadow-soft", className)}>
+      <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-5 md:px-6">
+        <div className="min-w-0">
+          <h2 className="text-base font-extrabold text-night">{title}</h2>
+          {subtitle && <p className="text-[13px] text-slate-text">{subtitle}</p>}
+        </div>
+        {action}
+      </div>
+      <div className={flush ? "mt-3" : "px-5 pb-5 pt-4 md:px-6 md:pb-6"}>{children}</div>
+    </section>
+  );
+}
+
+/* ─── CSV export ──────────────────────────────────── */
+/** Downloads rows as a UTF-8 CSV that Excel opens with Bengali text intact. */
+export function downloadCsv(filename: string, header: string[], rows: (string | number | boolean | null | undefined)[][]) {
+  const esc = (v: unknown) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    // Cells starting with = + - @ are neutralised so a spreadsheet won't run them as formulas.
+    const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+    return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const csv = "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

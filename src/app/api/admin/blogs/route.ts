@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // GET all blogs (admin sees all, public sees published only)
 export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("blogs.manage");
   if (!auth.ok) return auth.response;
   try {
     const all = req.nextUrl.searchParams.get("all");
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
 // POST - create new blog (admin only)
 export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("blogs.manage");
   if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH - update blog
 export async function PATCH(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("blogs.manage");
   if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin("blogs.manage");
   if (!auth.ok) return auth.response;
   try {
     const { id } = await req.json();

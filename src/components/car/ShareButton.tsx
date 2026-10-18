@@ -26,12 +26,9 @@ export function ShareButton({ title }: { title: string }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={share}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-    >
-      {copied ? <Check size={16} className="text-verified" aria-hidden /> : <Share2 size={16} aria-hidden />}
+    <button type="button" onClick={share}
+      className="inline-flex h-11 items-center gap-2 rounded-xl border border-hairline bg-white px-4 text-sm font-semibold text-night transition-colors hover:bg-mist">
+      {copied ? <Check size={17} className="text-verified" aria-hidden /> : <Share2 size={17} aria-hidden />}
       <span aria-live="polite">{copied ? "Link copied" : "Share"}</span>
     </button>
   );

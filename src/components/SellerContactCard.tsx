@@ -1,9 +1,10 @@
 "use client";
 
+import { useProgressRouter } from "@/components/layout/RouteProgress";
 import { useState, useEffect } from "react";
 import { Phone, MessageSquare, Loader2, MessageCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { dialableNumber, formatPhoneNumber } from "@/lib/contact-details";
 
 interface SellerContactCardProps {
   listingId: string;
@@ -13,7 +14,7 @@ interface SellerContactCardProps {
 
 export function SellerContactCard({ listingId, sellerId, carTitle }: SellerContactCardProps) {
   const { data: session } = useSession();
-  const router = useRouter();
+  const router = useProgressRouter();
   
   const [loading, setLoading] = useState(true);
   const [sellerData, setSellerData] = useState<any>(null);
@@ -69,20 +70,15 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
   const handleWhatsApp = () => {
     if (sellerData?.whatsappNumber) {
       const text = encodeURIComponent(`Hi, I'm interested in your ${carTitle} listed on CarHat.bd`);
-      let phone = sellerData.whatsappNumber.replace(/[^0-9]/g, "");
-      // Default prepend 880 if starts with 01
-      if (phone.startsWith("01") && phone.length === 11) {
-        phone = "880" + phone.substring(1);
-      }
-      window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+      window.open(`https://wa.me/${dialableNumber(sellerData.whatsappNumber)}?text=${text}`, "_blank", "noopener,noreferrer");
     }
   };
 
   if (loading) {
     return (
       <div className="space-y-3">
-        <div className="skeleton h-12 w-full rounded-lg" />
-        <div className="skeleton h-12 w-full rounded-lg" />
+        <div className="skeleton h-12 w-full rounded-xl" />
+        <div className="skeleton h-12 w-full rounded-xl" />
       </div>
     );
   }
@@ -93,15 +89,15 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
       {sellerData?.showPhone &&
         (phoneVisible ? (
           <a
-            href={`tel:${sellerData.phone}`}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-primary bg-card py-3 font-semibold text-primary tabular"
+            href={`tel:+${dialableNumber(sellerData.phone)}`}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-electric bg-white font-semibold text-electric tabular"
           >
-            <Phone size={19} aria-hidden /> Call {sellerData.phone}
+            <Phone size={19} aria-hidden /> Call {formatPhoneNumber(sellerData.phone)}
           </a>
         ) : (
           <button
             onClick={() => setPhoneVisible(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-[#0a4594]"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-electric font-semibold text-white shadow-glow transition-colors hover:bg-electric-deep"
           >
             <Phone size={19} aria-hidden /> Show phone number
           </button>
@@ -111,7 +107,7 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
       {sellerData?.showWhatsApp && (
         <button
           onClick={handleWhatsApp}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#075e54] py-3 font-semibold text-white transition-colors hover:bg-[#054d45]"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#128c4a] font-semibold text-white transition-colors hover:bg-[#0e7a40]"
         >
           <MessageCircle size={19} aria-hidden /> WhatsApp the seller
         </button>
@@ -122,7 +118,7 @@ export function SellerContactCard({ listingId, sellerId, carTitle }: SellerConta
         <button
           onClick={handleStartChat}
           disabled={startingChat}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-card py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-night font-semibold text-white transition-colors hover:bg-electric disabled:opacity-60"
         >
           {startingChat ? (
             <Loader2 size={20} className="animate-spin" />

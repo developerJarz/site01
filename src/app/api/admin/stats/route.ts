@@ -4,6 +4,9 @@ import { User } from "@/lib/models/User";
 import { Listing } from "@/lib/models/Listing";
 import { Conversation } from "@/lib/models/Conversation";
 import { Message } from "@/lib/models/Message";
+import { Favorite } from "@/lib/models/Favorite";
+import { NewsletterSubscriber } from "@/lib/models/NewsletterSubscriber";
+import { ContactMessage } from "@/lib/models/ContactMessage";
 import { requireAdmin } from "@/lib/admin-auth";
 import { listingImageUrl } from "@/lib/utils";
 
@@ -44,11 +47,15 @@ export async function GET(req: NextRequest) {
 
     // Lightweight counts for the admin sidebar badges.
     if (req.nextUrl.searchParams.get("summary") === "1") {
-      const [pendingListings, paperAwaiting] = await Promise.all([
+      const [pendingListings, paperAwaiting, newMessages] = await Promise.all([
         Listing.countDocuments({ status: "pending" }),
         Listing.countDocuments({ paperVerified: { $ne: true }, "documents.0": { $exists: true }, status: { $ne: "removed" } }),
+        ContactMessage.countDocuments({ status: "new" }),
       ]);
-      return NextResponse.json({ pendingListings, paperAwaiting });
+      return NextResponse.json({ pendingListings, paperAwaiting, newMessages });
+    }
+    if (!auth.can("dashboard.view")) {
+      return NextResponse.json({ error: "Your role doesn't include the dashboard." }, { status: 403 });
     }
 
     const requested = Number(req.nextUrl.searchParams.get("days"));
@@ -127,6 +134,52 @@ export async function GET(req: NextRequest) {
       User.find().sort({ createdAt: -1 }).limit(6).select("name email role createdAt isVerified").lean(),
     ]);
 
+    // Engagement, geography and pricing for the advanced panels.
+    const [
+      savesInPeriod,
+      soldInPeriod,
+      totalSaves,
+      subscribers,
+      subscribersInPeriod,
+      inboxNew,
+      chatSeriesRaw,
+      cityGroups,
+      sellerGroups,
+      priceBuckets,
+      conditionGroups,
+    ] = await Promise.all([
+      Favorite.countDocuments({ createdAt: { $gte: since } }),
+      Listing.countDocuments({ status: "sold", updatedAt: { $gte: since } }),
+      Favorite.estimatedDocumentCount(),
+      NewsletterSubscriber.estimatedDocumentCount(),
+      NewsletterSubscriber.countDocuments({ createdAt: { $gte: since } }),
+      ContactMessage.countDocuments({ status: "new" }),
+      Conversation.aggregate(perDay(since)),
+      // "Gulshan, Dhaka" → "Dhaka": the last comma-separated part is the city.
+      Listing.aggregate([
+        { $match: { status: "active", location: { $type: "string", $ne: "" } } },
+        { $project: { city: { $trim: { input: { $arrayElemAt: [{ $split: ["$location", ","] }, -1] } } } } },
+        { $group: { _id: "$city", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 8 },
+      ]),
+      Listing.aggregate([
+        { $match: { status: "active" } },
+        { $group: { _id: "$sellerId", live: { $sum: 1 }, views: { $sum: "$views" }, value: { $sum: "$price" } } },
+        { $sort: { live: -1, views: -1 } },
+        { $limit: 6 },
+        { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "u" } },
+        { $project: { live: 1, views: 1, value: 1, name: { $arrayElemAt: ["$u.name", 0] }, dealershipName: { $arrayElemAt: ["$u.dealershipName", 0] }, role: { $arrayElemAt: ["$u.role", 0] } } },
+      ]),
+      Listing.aggregate([
+        { $match: { status: "active" } },
+        { $bucket: { groupBy: "$price", boundaries: [0, 1_000_000, 2_000_000, 4_000_000, 10_000_000], default: "top", output: { count: { $sum: 1 } } } },
+      ]),
+      Listing.aggregate([{ $match: { status: "active" } }, { $group: { _id: "$condition", count: { $sum: 1 } } }]),
+    ]);
+
+    const BUCKET_LABEL: Record<string, string> = { "0": "Under 10 lakh", "1000000": "10–20 lakh", "2000000": "20–40 lakh", "4000000": "40 lakh–1 crore", top: "Above 1 crore" };
+
     const byStatus: Record<string, number> = { active: 0, pending: 0, sold: 0, removed: 0 };
     for (const g of statusGroups) byStatus[g._id] = g.count;
     const value = Object.fromEntries(valueGroups.map((g) => [g._id, { total: g.total, avg: g.avg }]));
@@ -152,11 +205,26 @@ export async function GET(req: NextRequest) {
         listingsPrevPeriod,
         conversationsInPeriod,
         messagesInPeriod,
+        savesInPeriod,
+        soldInPeriod,
+        totalSaves,
+        subscribers,
+        subscribersInPeriod,
+        inboxNew,
       },
       series: {
         listings: dailySeries(listingSeriesRaw, days, now),
         users: dailySeries(userSeriesRaw, days, now),
+        chats: dailySeries(chatSeriesRaw, days, now),
       },
+      cities: cityGroups.filter((c) => c._id).map((c) => ({ city: c._id as string, count: c.count as number })),
+      topSellers: JSON.parse(JSON.stringify(sellerGroups)).map((s: any) => ({
+        _id: s._id, name: s.dealershipName || s.name || "Deleted account", dealer: s.role === "dealer" || !!s.dealershipName, live: s.live, views: s.views, value: s.value,
+      })),
+      priceBands: ["0", "1000000", "2000000", "4000000", "top"].map((k) => ({
+        key: k, label: BUCKET_LABEL[k], count: (priceBuckets.find((b) => String(b._id) === k)?.count as number) || 0,
+      })),
+      conditions: conditionGroups.map((c) => ({ condition: String(c._id || "unknown"), count: c.count as number })),
       makes: makeGroups.map((m) => ({ make: m._id || "Other", count: m.count, avgPrice: Math.round(m.avgPrice || 0) })),
       queue: JSON.parse(JSON.stringify(queue.map(withThumb))),
       topViewed: JSON.parse(JSON.stringify(topViewed.map(withThumb))),

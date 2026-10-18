@@ -6,6 +6,15 @@ import bcrypt from "bcryptjs";
 import { connectToDatabase } from "./db";
 import { User } from "./models/User";
 
+const ROLE_REFRESH_MS = 5 * 60 * 1000;
+
+/** Last sign-in time for the admin user list. Never blocks or fails the sign-in itself. */
+function recordLogin(userId: string) {
+  User.updateOne({ _id: userId }, { $set: { lastLoginAt: new Date() }, $inc: { loginCount: 1 } }).catch((error) => {
+    console.warn("Couldn't record sign-in time:", error);
+  });
+}
+
 // Build providers list — only add Auth0 if env vars are configured
 const providers: Provider[] = [];
 
@@ -40,15 +49,20 @@ providers.push(
         if (!isPasswordValid) {
           throw new Error("Invalid password");
         }
+        if (user.status === "suspended") {
+          throw new Error("Account suspended");
+        }
+        recordLogin(user._id.toString());
         return {
           id: user._id.toString(),
           name: user.name,
           email: user.email,
+          image: user.avatar || null,
           role: user.role,
         };
       } catch (error: any) {
         // Re-throw known errors, wrap unknown ones
-        if (error.message === "Invalid credentials" || error.message === "No user found" || error.message === "Invalid password") {
+        if (["Invalid credentials", "No user found", "Invalid password", "Account suspended"].includes(error.message)) {
           throw error;
         }
         console.error("Auth error:", error);
@@ -77,9 +91,13 @@ export const authOptions: NextAuthOptions = {
             });
             (user as any).role = "buyer";
             (user as any).id = newUser._id.toString();
+            user.image = newUser.avatar || null;
           } else {
+            if (existingUser.status === "suspended") return "/login?error=Account%20suspended";
+            recordLogin(existingUser._id.toString());
             (user as any).role = existingUser.role;
             (user as any).id = existingUser._id.toString();
+            user.image = existingUser.avatar || null;
           }
         } catch (error) {
           console.error("Auth0 signIn callback error:", error);
@@ -88,10 +106,35 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = (user as any).role;
         token.id = (user as any).id;
+        token.roleCheckedAt = Date.now();
+        return token;
+      }
+      // Re-read the role every few minutes so a demoted or deleted account loses access without
+      // waiting for its 30-day token to expire.
+      const stale = Date.now() - (Number(token.roleCheckedAt) || 0) > ROLE_REFRESH_MS;
+      if (token.id && (stale || trigger === "update")) {
+        try {
+          await connectToDatabase();
+          const current = await User.findById(token.id).select("role name avatar status").lean();
+          // Deleted and suspended accounts lose their session at the next check.
+          if (!current || current.status === "suspended") {
+            token.role = undefined;
+            token.id = undefined;
+            token.picture = null;
+          } else {
+            token.role = current.role;
+            token.name = current.name;
+            token.picture = current.avatar || null;
+          }
+          token.roleCheckedAt = Date.now();
+        } catch (error) {
+          // Keep the last known role if the database is briefly unreachable.
+          console.error("Role refresh failed:", error);
+        }
       }
       return token;
     },
@@ -99,6 +142,7 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         (session.user as any).role = token.role;
         (session.user as any).id = token.id;
+        session.user.image = token.picture || null;
       }
       return session;
     },

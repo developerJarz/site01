@@ -1,130 +1,122 @@
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import fs from "fs/promises";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { uploadImage, uploadDocument, deleteImage } from "@/lib/cloudinary";
+import { optimiseOrDefer } from "@/lib/image-processing";
+import { ImageUploadError, MAX_IMAGE_BYTES, validateImageFile, validateUploadOrigin } from "@/lib/image-upload";
+import { connectToDatabase } from "@/lib/db";
+import { User } from "@/lib/models/User";
+import { getSiteSettings } from "@/lib/site-settings";
+import { permissionsForRole } from "@/lib/staff-roles";
+import { watermarkSpecFromSettings, type WatermarkSpec } from "@/lib/watermark";
+
+/** Team roles that place images on the website itself (logo, favicon, banners, share images). */
+const SITE_IMAGE_PERMISSIONS = ["appearance.manage", "seo.manage", "blogs.manage", "settings.manage"];
+
+/**
+ * The copyright mark for a listing photo, from Admin → Settings → Watermark: the site name and,
+ * if switched on, the name of the person who posted it.
+ */
+async function listingWatermark(userId: string): Promise<WatermarkSpec | null> {
+  const { siteName, watermark } = await getSiteSettings();
+  if (!watermark.enabled) return null;
+  let uploader = "";
+  if (watermark.showUploader) {
+    await connectToDatabase();
+    const user = await User.findById(userId).select("name dealershipName role").lean().catch(() => null);
+    uploader = (user?.role === "dealer" && user.dealershipName?.trim()) || user?.name?.trim() || "";
+  }
+  return watermarkSpecFromSettings(watermark, siteName, uploader);
+}
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+// One photo is usually done in a second or two, but a slow Cloudinary response on a bad day can
+// take longer; hosts that honour this give the request up to a minute instead of cutting it off.
+export const maxDuration = 60;
 
-// Safely attempt to load sharp if available on the server runtime
-async function getSharp() {
+/** Fallback when Cloudinary is unreachable: local disk where the host allows it, otherwise inline. */
+async function saveDocumentLocally(output: Buffer, pdf: boolean) {
+  const name = `doc-${randomUUID()}.${pdf ? "pdf" : "webp"}`;
   try {
-    const sharpModule = await import("sharp");
-    return sharpModule.default || sharpModule;
-  } catch (e) {
-    console.warn("Sharp native module not available, using raw buffer fallback:", e);
-    return null;
+    const directory = path.join(process.cwd(), "public", "uploads");
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, name), output);
+    return `/uploads/${name}`;
+  } catch {
+    return `data:${pdf ? "application/pdf" : "image/webp"};base64,${output.toString("base64")}`;
   }
 }
 
 export async function POST(req: NextRequest) {
+  const uploadedIds: string[] = [];
   try {
-    const formData = await req.formData();
-    const rawFiles = formData.getAll("files");
-
-    if (!rawFiles || rawFiles.length === 0) {
-      return NextResponse.json({ error: "No files provided in request" }, { status: 400 });
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    if (!userId) return NextResponse.json({ error: "Sign in to upload photos." }, { status: 401 });
+    validateUploadOrigin(req);
+    if (Number(req.headers.get("content-length")) > MAX_IMAGE_BYTES + 1024 * 1024) {
+      throw new ImageUploadError("Upload at most 25 MB at a time.", 413);
     }
 
-    const files: File[] = [];
-    for (const item of rawFiles) {
-      if (item && typeof (item as any).arrayBuffer === "function") {
-        files.push(item as File);
-      }
+    const form = await req.formData().catch(() => { throw new ImageUploadError("Invalid upload request."); });
+    const purpose = form.get("purpose") || "listing";
+    if (purpose !== "listing" && purpose !== "documents" && purpose !== "site") throw new ImageUploadError("Invalid upload purpose.");
+    if (purpose === "site") {
+      const granted = await permissionsForRole((session?.user as { role?: string }).role);
+      if (!granted.some((p) => SITE_IMAGE_PERMISSIONS.includes(p))) throw new ImageUploadError("Only the team can upload website images.", 403);
+    }
+    // Favicons stay PNG so every browser can show them.
+    const asPng = purpose === "site" && form.get("format") === "png";
+    const files = form.getAll("files");
+    if (!files.length || files.length > 15 || files.some((file) => !(file instanceof File))) {
+      throw new ImageUploadError("Choose between 1 and 15 files.");
+    }
+    const uploads = files as File[];
+    if (uploads.reduce((total, file) => total + file.size, 0) > MAX_IMAGE_BYTES) {
+      throw new ImageUploadError("Upload at most 25 MB at a time.", 413);
+    }
+    for (const file of uploads) {
+      if (purpose === "documents" && file.type === "application/pdf") {
+        if (!file.size || file.size > 12 * 1024 * 1024) throw new ImageUploadError("Choose a PDF smaller than 12 MB.");
+      } else validateImageFile(file);
     }
 
-    if (files.length === 0) {
-      return NextResponse.json({ error: "No valid file objects received" }, { status: 400 });
-    }
-
+    const watermark = purpose === "listing" ? await listingWatermark(userId) : null;
     const urls: string[] = [];
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-
-    let canWriteToDisk = false;
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      const testFile = path.join(uploadDir, `.write-test-${Date.now()}`);
-      await fs.writeFile(testFile, "ok");
-      await fs.unlink(testFile);
-      canWriteToDisk = true;
-    } catch {
-      canWriteToDisk = false;
-    }
-
-    const sharp = await getSharp();
-
-    for (const file of files) {
+    for (const file of uploads) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const isImage =
-        file.type?.startsWith("image/") ||
-        /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(file.name);
-
-      if (canWriteToDisk) {
+      if (purpose === "site") {
+        const compressed = await optimiseOrDefer(buffer, "site", { png: asPng });
+        const image = await uploadImage(compressed ?? buffer, userId, "site", { compressed: !!compressed });
+        uploadedIds.push(image.public_id);
+        urls.push(image.secure_url);
+      } else if (purpose === "listing") {
+        const compressed = await optimiseOrDefer(buffer, "listing", { watermark });
+        const image = await uploadImage(compressed ?? buffer, userId, "listing", { compressed: !!compressed, watermark });
+        uploadedIds.push(image.public_id);
+        urls.push(image.secure_url);
+      } else {
+        const pdf = file.type === "application/pdf";
+        if (pdf && buffer.subarray(0, 5).toString() !== "%PDF-") throw new ImageUploadError("Choose a valid PDF document.");
+        const compressed = pdf ? buffer : await optimiseOrDefer(buffer, "document");
         try {
-          if (isImage) {
-            const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
-            const filepath = path.join(uploadDir, filename);
-
-            if (sharp) {
-              try {
-                await sharp(buffer)
-                  .resize(1600, 1200, { fit: "inside", withoutEnlargement: true })
-                  .webp({ quality: 80, effort: 4 })
-                  .toFile(filepath);
-                urls.push(`/uploads/${filename}`);
-                continue;
-              } catch (sharpProcessErr) {
-                console.warn("Sharp image transform failed, writing buffer directly:", sharpProcessErr);
-              }
-            }
-
-            // Direct buffer write (loss-free, fast, no native dependency needed)
-            await fs.writeFile(filepath, buffer);
-            urls.push(`/uploads/${filename}`);
-            continue;
-          } else {
-            // Non-image Document (PDF, etc.)
-            const rawExt = path.extname(file.name || "") || ".pdf";
-            const cleanExt = rawExt.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 6) || ".pdf";
-            const filename = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${cleanExt}`;
-            const filepath = path.join(uploadDir, filename);
-
-            await fs.writeFile(filepath, buffer);
-            urls.push(`/uploads/${filename}`);
-            continue;
-          }
-        } catch (diskWriteErr) {
-          console.warn("Disk write error, falling back to data URL:", diskWriteErr);
+          // Private Cloudinary storage: papers never sit in the public photo library or in the database.
+          const doc = await uploadDocument(compressed ?? buffer, userId, { pdf, compressed: !!compressed });
+          urls.push(doc.secure_url);
+        } catch (error) {
+          if (!compressed) throw error;
+          urls.push(await saveDocumentLocally(compressed, pdf));
         }
       }
-
-      // Read-only filesystem / Serverless Fallback -> Data URL (Base64)
-      if (isImage && sharp) {
-        try {
-          const webpBuffer = await sharp(buffer)
-            .resize(1200, 900, { fit: "inside", withoutEnlargement: true })
-            .webp({ quality: 75 })
-            .toBuffer();
-          const base64 = webpBuffer.toString("base64");
-          urls.push(`data:image/webp;base64,${base64}`);
-          continue;
-        } catch (sharpErr) {
-          console.warn("Sharp buffer conversion failed, using raw buffer:", sharpErr);
-        }
-      }
-
-      // Raw buffer to base64
-      const mime = file.type || (isImage ? "image/webp" : "application/pdf");
-      const base64 = buffer.toString("base64");
-      urls.push(`data:${mime};base64,${base64}`);
     }
-
     return NextResponse.json({ success: true, urls });
-  } catch (error: any) {
-    console.error("Upload fatal error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to process upload" },
-      { status: 500 }
-    );
+  } catch (error) {
+    await Promise.allSettled(uploadedIds.map(deleteImage));
+    const known = error instanceof ImageUploadError;
+    return NextResponse.json({ error: known ? error.message : "Couldn't upload your files. Please try again." }, { status: known ? error.status : 500 });
   }
 }
-
-

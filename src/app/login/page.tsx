@@ -1,184 +1,107 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/RouteProgress";
+import { Suspense, useEffect, useState } from "react";
+import { PageLoader } from "@/components/ui/brand-loader";
 import Link from "next/link";
-import Image from "next/image";
-import { CheckCircle2, Loader2, AlertCircle, Shield } from "lucide-react";
-import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { useSearchParams } from "next/navigation";
+import { getProviders, signIn } from "next-auth/react";
+import { Loader2, ShieldCheck } from "lucide-react";
+import { AuthShell, PasswordField } from "@/components/auth/AuthShell";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/page";
+
+const MESSAGES: Record<string, string> = {
+  "Invalid credentials": "Enter your email and password.",
+  "No user found": "That email or password isn't right.",
+  "Invalid password": "That email or password isn't right.",
+  "Account suspended": "This account has been suspended. Contact support if you think this is a mistake.",
+  "Authentication failed": "Something went wrong on our side. Try again in a moment.",
+  CredentialsSignin: "That email or password isn't right.",
+};
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-primary" />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoader />}>
       <LoginForm />
     </Suspense>
   );
 }
 
 function LoginForm() {
-  const router = useRouter();
+  const router = useProgressRouter();
   const searchParams = useSearchParams();
-  const { settings } = useSiteSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [auth0Loading, setAuth0Loading] = useState(false);
-  const [registered, setRegistered] = useState(searchParams.get("registered") === "true");
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const [hasAuth0, setHasAuth0] = useState(false);
+  const registered = searchParams.get("registered") === "true";
+  const reset = searchParams.get("reset") === "true";
   // Only follow same-site paths so the login page can't be used as an open redirect.
   const rawCallback = searchParams.get("callbackUrl") || "";
   const callbackUrl = rawCallback.startsWith("/") && !rawCallback.startsWith("//") ? rawCallback : "/dashboard";
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    getProviders().then((p) => setHasAuth0(!!p?.auth0)).catch(() => {});
+  }, []);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const res = await signIn("credentials", {
-        email: email.toLowerCase().trim(),
-        password,
-        redirect: false,
-      });
-
-      if (res?.error) {
-        const errorMsg = res.error;
-        const messages: Record<string, string> = {
-          "Invalid credentials": "Please enter your email and password.",
-          "No user found": "No account found with this email. Please check your email or create a new account.",
-          "Invalid password": "Incorrect password. Please try again.",
-          "Authentication failed": "Something went wrong. Please try again later.",
-          "CredentialsSignin": "Invalid email or password. Please try again.",
-        };
-        setError(messages[errorMsg] || "Invalid email or password. Please try again.");
-      } else if (res?.ok) {
+      const res = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false });
+      if (res?.ok && !res.error) {
         router.push(callbackUrl);
         router.refresh();
         return;
-      } else {
-        setError("Unable to sign in. Please check your network connection and try again.");
       }
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("An unexpected error occurred. Please try again.");
+      setError(MESSAGES[res?.error || ""] || "That email or password isn't right.");
+    } catch {
+      setError("Couldn't reach CarHat. Check your connection and try again.");
     }
-
     setLoading(false);
   };
 
-  const handleAuth0Login = () => {
-    setAuth0Loading(true);
-    signIn("auth0", { callbackUrl });
-  };
-
-  const logoSrc = settings.logoUrl || "/car-hat-bd.png";
-
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-muted/30 px-4 py-12">
-      <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl">
-        <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="mb-4 group">
-            <div className="relative h-12 flex items-center">
-              <Image
-                src={logoSrc}
-                alt={settings.siteName || "CarHat.bd"}
-                width={160}
-                height={44}
-                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
-              />
-            </div>
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground text-sm">Sign in to your {settings.siteName || "CarHat.bd"} account</p>
+    <AuthShell
+      title="Welcome back"
+      description="Sign in to message sellers, save cars and manage your listings."
+      footer={<>New to CarHat? <Link href="/register" className="font-bold text-electric hover:underline">Create a free account</Link></>}
+    >
+      {registered && <Alert tone="success" className="mb-5">Your account is ready. Sign in to continue.</Alert>}
+      {reset && <Alert tone="success" className="mb-5">Password changed. Sign in with your new password.</Alert>}
+      {error && <Alert className="mb-5">{error}</Alert>}
+
+      {hasAuth0 && (
+        <>
+          <Button type="button" variant="secondary" size="lg" className="w-full" disabled={ssoLoading || loading}
+            onClick={() => { setSsoLoading(true); void signIn("auth0", { callbackUrl }); }}>
+            {ssoLoading ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <ShieldCheck size={18} className="text-electric" aria-hidden />}
+            {ssoLoading ? "Redirecting…" : "Continue with Google or Auth0"}
+          </Button>
+          <div className="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-text">
+            <span className="h-px grow bg-hairline" /> or with email <span className="h-px grow bg-hairline" />
+          </div>
+        </>
+      )}
+
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label htmlFor="login-email" className="field-label">Email</label>
+          <input id="login-email" type="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required placeholder="you@example.com" />
         </div>
-
-        {registered && (
-          <div className="bg-green-500/10 text-verified text-sm p-3 rounded-md mb-6 border border-green-500/20 flex items-center gap-2">
-            <CheckCircle2 size={16} />
-            Account created successfully! Sign in to continue.
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md mb-6 border border-destructive/20 flex items-center gap-2">
-            <AlertCircle size={16} />
-            {error}
-          </div>
-        )}
-
-        {/* Auth0 Social Login */}
-        <button
-          id="auth0-login-btn"
-          type="button"
-          onClick={handleAuth0Login}
-          disabled={auth0Loading || loading}
-          className="w-full bg-[#EB5424] text-white py-2.5 rounded-lg font-medium hover:bg-[#d44a1f] transition-colors shadow-lg shadow-[#EB5424]/20 disabled:opacity-50 flex items-center justify-center gap-2 mb-4"
-        >
-          {auth0Loading ? <Loader2 size={18} className="animate-spin" /> : <Shield size={18} />}
-          {auth0Loading ? "Redirecting..." : "Continue with Auth0"}
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">or sign in with email</span>
-          <div className="flex-1 h-px bg-border" />
+        <PasswordField id="login-password" label="Password" value={password} onChange={setPassword} autoComplete="current-password" />
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-sm font-semibold text-electric hover:underline">Forgot password?</Link>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || auth0Loading}
-            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-card disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : null}
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-primary hover:underline font-medium">
-            Create one
-          </Link>
-        </div>
-      </div>
-    </div>
+        <Button type="submit" size="lg" className="w-full" disabled={loading || ssoLoading}>
+          {loading && <Loader2 size={18} className="animate-spin" aria-hidden />}
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

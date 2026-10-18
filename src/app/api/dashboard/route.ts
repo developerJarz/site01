@@ -8,6 +8,7 @@ import { Review } from "@/lib/models/Review";
 import { Blog } from "@/lib/models/Blog";
 import { User } from "@/lib/models/User";
 import { listingImageUrl } from "@/lib/utils";
+import { profileCompletion } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,7 @@ export async function GET() {
     const user = await User.findById(userId).select("-password").lean();
 
     // Calculate profile completeness
-    const profileFields = ["name", "email", "phone", "bio", "address", "city", "avatar"];
-    const filledFields = profileFields.filter((f) => user && (user as any)[f]);
-    const profileCompleteness = Math.round((filledFields.length / profileFields.length) * 100);
+    const profileCompleteness = profileCompletion(user || {}).percentage;
 
     // Fetch user's listings
     // Cover photo and first paper only: enough to render the list and know papers exist.
