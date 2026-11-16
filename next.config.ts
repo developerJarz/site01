@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   poweredByHeader: false,
   // Watermark fonts and preview photos are read from disk at runtime, so the tracer can't see them on its own.
   outputFileTracingIncludes: {
