@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
         <div className="grid gap-6 xl:grid-cols-2">
           <Panel title="Contact details" subtitle="Shown in the footer, the contact page and Google's business details">
             <div className="space-y-4">
-              <Field label="Support email" htmlFor="s-email"><IconInput icon={Mail}><input id="s-email" type="email" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="carhatbd@gmail.com" className={cn(inputClass, "pl-10")} /></IconInput></Field>
+              <Field label="Support email" htmlFor="s-email"><IconInput icon={Mail}><input id="s-email" type="email" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="support@example.com" className={cn(inputClass, "pl-10")} /></IconInput></Field>
               <Field label="Support phone" htmlFor="s-phone"><IconInput icon={Phone}><input id="s-phone" value={form.supportPhone} onChange={(e) => set("supportPhone", e.target.value)} placeholder="+880 1700-000000" className={cn(inputClass, "pl-10")} /></IconInput></Field>
               <Field label="Working hours" htmlFor="s-hours"><IconInput icon={Clock}><input id="s-hours" value={form.workingHours} onChange={(e) => set("workingHours", e.target.value)} placeholder="Sat – Thu: 9 AM – 8 PM" className={cn(inputClass, "pl-10")} /></IconInput></Field>
               <Field label="Office address" htmlFor="s-address"><IconInput icon={MapPin}><input id="s-address" value={form.address} onChange={(e) => set("address", e.target.value)} className={cn(inputClass, "pl-10")} /></IconInput></Field>

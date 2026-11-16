@@ -3,7 +3,12 @@
   publish = ".next"
 
 [build.environment]
-  SECRETS_SCAN_OMIT_PATHS = ".next, .next/**"
+  # Build output and local tooling/test folders are not deployable secret sources.
+  SECRETS_SCAN_OMIT_PATHS = ".next/**,.netlify/**,graphify-out/**,.agents/**,tests/**"
+  # These env vars hold public configuration (site URL, SMTP host/port/sender,
+  # Auth0 tenant domain), not secrets. Their values legitimately appear in the
+  # code, so exclude them from Netlify's secrets scanner.
+  SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL,APP_BASE_URL,URL,SMTP_HOST,SMTP_PORT,SMTP_FROM,AUTH0_DOMAIN,AUTH0_ISSUER"
 
 [dev]
   command = "npm run dev"
