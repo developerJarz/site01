@@ -9,6 +9,7 @@ import { CarImage } from "@/components/CarImage";
 import type { CarCardData } from "@/components/CarCard";
 import { COMPARE_LIMIT, useMarketplace } from "@/context/MarketplaceContext";
 import { cn, formatKm, formatLakh } from "@/lib/utils";
+import { fuelLabel } from "@/lib/fuel";
 
 const FUEL: Record<string, string> = { petrol: "Petrol", diesel: "Diesel", cng: "CNG", hybrid: "Hybrid", electric: "Electric", octane: "Octane" };
 const GEAR: Record<string, string> = { automatic: "Automatic", manual: "Manual", "semi-automatic": "Semi-auto" };
@@ -130,7 +131,7 @@ const ROWS: Row[] = [
   { label: "Price", value: (c) => <span className="price-tag text-electric">{formatLakh(c.price)}</span>, best: (cars) => pick(cars, (c) => c.price) },
   { label: "Year", value: (c) => c.year ?? "—", best: (cars) => pick(cars, (c) => (c.year ? -c.year : undefined)) },
   { label: "Mileage", value: (c) => (c.mileage !== undefined ? formatKm(c.mileage) : "—"), best: (cars) => pick(cars, (c) => c.mileage) },
-  { label: "Fuel", value: (c) => (c.fuelType ? FUEL[c.fuelType] || c.fuelType : "—") },
+  { label: "Fuel", value: (c) => fuelLabel(c, FUEL) || "—" },
   { label: "Transmission", value: (c) => (c.transmission ? GEAR[c.transmission] || c.transmission : "—") },
   { label: "Condition", value: (c) => (c.condition ? CONDITION[c.condition] || c.condition : "—") },
   { label: "Location", value: (c) => c.location || "—" },

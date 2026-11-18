@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logActivity, plural } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { User } from "@/lib/models/User";
 import { StaffRole } from "@/lib/models/StaffRole";
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
     if (await StaffRole.exists({ key })) return NextResponse.json({ error: "A role with that name already exists." }, { status: 409 });
     await StaffRole.create({ key, name, description: text(body.description, 200), permissions, builtIn: false });
     invalidateStaffRoles();
+    await logActivity(auth.session, { action: "role.create", summary: `Created role “${name}”`, targetId: key, targetLabel: name, details: { permissions } }, req);
     return NextResponse.json({ success: true, key });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
@@ -85,6 +87,7 @@ export async function PATCH(req: Request) {
     await connectToDatabase();
     await StaffRole.updateOne({ key }, { $set: { key, name, description, permissions, builtIn: isBuiltIn(key) } }, { upsert: true });
     invalidateStaffRoles();
+    await logActivity(auth.session, { action: "role.update", summary: `Changed role “${name}”`, targetId: key, targetLabel: name, details: { permissions } }, req);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
@@ -108,6 +111,7 @@ export async function DELETE(req: Request) {
     if (isBuiltIn(key)) {
       await StaffRole.deleteOne({ key });
       invalidateStaffRoles();
+      await logActivity(auth.session, { action: "role.reset", summary: `Reset built-in role “${key}” to its default permissions`, targetId: key, targetLabel: key }, req);
       return NextResponse.json({ success: true, reset: true });
     }
     if (!(await StaffRole.exists({ key }))) return NextResponse.json({ error: "Role not found." }, { status: 404 });
@@ -123,6 +127,11 @@ export async function DELETE(req: Request) {
     }
     await StaffRole.deleteOne({ key });
     invalidateStaffRoles();
+    await logActivity(auth.session, {
+      action: "role.delete",
+      summary: members ? `Deleted role “${key}” and moved ${plural(members, "person")} to ${text(body.reassignTo, 32)}` : `Deleted role “${key}”`,
+      targetId: key, targetLabel: key,
+    }, req);
     return NextResponse.json({ success: true, moved: members });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

@@ -36,6 +36,9 @@ import {
 import { useToast } from "@/components/admin/Toast";
 import { cn, formatLakh, formatTaka, timeAgo } from "@/lib/utils";
 import { autoListingDescription, autoListingTitle, listingImageAlt } from "@/lib/seo-text";
+import { FuelPicker } from "@/components/FuelPicker";
+import { listingFuels } from "@/lib/fuel";
+import { localPhoneNumber } from "@/lib/contact-details";
 
 interface Listing {
   _id: string;
@@ -49,6 +52,9 @@ interface Listing {
   year: number;
   mileage: number;
   fuelType: string;
+  fuelTypes?: string[];
+  contactPhone?: string;
+  contactWhatsApp?: string;
   transmission: string;
   engineSize: number;
   color: string;
@@ -620,7 +626,9 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
     model: listing.model || "",
     year: listing.year || new Date().getFullYear(),
     mileage: listing.mileage || 0,
-    fuelType: listing.fuelType || "petrol",
+    fuelTypes: listingFuels(listing).length ? listingFuels(listing) : ["petrol"],
+    contactPhone: localPhoneNumber(listing.contactPhone) || "",
+    contactWhatsApp: localPhoneNumber(listing.contactWhatsApp) || "",
     transmission: listing.transmission || "manual",
     engineSize: listing.engineSize || 0,
     color: listing.color || "",
@@ -725,13 +733,6 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
           <Field label="Mileage (km)" htmlFor="e-km"><input id="e-km" {...num("mileage")} /></Field>
         </div>
         <div className="sm:col-span-2">
-          <Field label="Fuel" htmlFor="e-fuel">
-            <select id="e-fuel" value={form.fuelType} onChange={(e) => set("fuelType", e.target.value)} className={inputClass}>
-              {["petrol", "octane", "hybrid", "diesel", "cng", "electric"].map((f) => <option key={f} value={f}>{f === "cng" ? "CNG" : f[0].toUpperCase() + f.slice(1)}</option>)}
-            </select>
-          </Field>
-        </div>
-        <div className="sm:col-span-2">
           <Field label="Transmission" htmlFor="e-trans">
             <select id="e-trans" value={form.transmission} onChange={(e) => set("transmission", e.target.value)} className={inputClass}>
               <option value="automatic">Automatic</option>
@@ -749,6 +750,24 @@ function EditListing({ listing, onClose, onSaved }: { listing: Listing; onClose:
         <div className="sm:col-span-2">
           <Field label="Location" htmlFor="e-loc"><input id="e-loc" value={form.location} onChange={(e) => set("location", e.target.value)} className={inputClass} /></Field>
         </div>
+        <div className="sm:col-span-6">
+          <FuelPicker value={form.fuelTypes} onChange={(v) => set("fuelTypes", v)} />
+        </div>
+        <fieldset className="grid gap-4 rounded-2xl border border-hairline p-4 sm:col-span-6 sm:grid-cols-2">
+          <legend className="px-1 text-sm font-bold">Contact numbers for this car</legend>
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Buyers see these on this car instead of the seller account&apos;s numbers
+            {listing.sellerId?.phone ? ` (${listing.sellerId.phone})` : ""}. Leave empty to use the account&apos;s numbers.
+          </p>
+          <Field label="Phone number" htmlFor="e-contact-phone">
+            <input id="e-contact-phone" type="tel" inputMode="tel" placeholder="01712 345678" maxLength={25} value={form.contactPhone}
+              onChange={(e) => set("contactPhone", e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="WhatsApp number" htmlFor="e-contact-wa" hint="Leave empty for no WhatsApp override.">
+            <input id="e-contact-wa" type="tel" inputMode="tel" placeholder="01712 345678" maxLength={25} value={form.contactWhatsApp}
+              onChange={(e) => set("contactWhatsApp", e.target.value)} className={inputClass} />
+          </Field>
+        </fieldset>
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 sm:col-span-6">
           <input type="checkbox" checked={form.featured} onChange={(e) => set("featured", e.target.checked)} className="h-[18px] w-[18px] accent-primary" />
           <span>

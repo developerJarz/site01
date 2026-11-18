@@ -1,4 +1,5 @@
 import { formatKm, formatLakh } from "./utils.ts";
+import { fuelLabel } from "./fuel.ts";
 
 /**
  * Search text generated from a listing's own details. Used whenever the admin hasn't written
@@ -15,6 +16,7 @@ type CarLike = {
   mileage?: number;
   condition?: string;
   fuelType?: string;
+  fuelTypes?: string[];
   transmission?: string;
   color?: string;
   location?: string;
@@ -62,7 +64,7 @@ export function listingSeoTitle(car: CarLike) {
 
 /** e.g. "Buy this used 2018 Toyota Axio (hybrid, automatic, 45,000 km) in Dhaka for ৳ 18.5 Lakh. Papers verified …" */
 export function autoListingDescription(car: CarLike) {
-  const specs = [FUEL_WORD[car.fuelType || ""], car.transmission?.replace("-", " "), car.mileage ? formatKm(car.mileage) : ""].filter(Boolean).join(", ");
+  const specs = [fuelLabel(car, FUEL_WORD), car.transmission?.replace("-", " "), car.mileage ? formatKm(car.mileage) : ""].filter(Boolean).join(", ");
   const condition = (CONDITION_WORD[car.condition || ""] || "").toLowerCase();
   const lead = `Buy this ${condition} ${carName(car)}${specs ? ` (${specs})` : ""} in ${cityOf(car.location)}${car.price ? ` for ${formatLakh(car.price)}` : ""}.`;
   const trust = car.paperVerified ? " Papers verified by CarHat." : "";

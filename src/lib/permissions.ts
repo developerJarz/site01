@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   { key: "appearance.manage", label: "Edit the website: header, footer, homepage, brand", group: "Website" },
   { key: "settings.manage", label: "Change site settings and maintenance mode", group: "System" },
   { key: "system.view", label: "See system health", group: "System" },
+  { key: "activity.view", label: "See the team activity log", group: "System" },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]["key"];
@@ -78,6 +79,7 @@ export const ADMIN_PAGE_PERMISSION: { prefix: string; anyOf: Permission[] }[] = 
   { prefix: "/admin/appearance", anyOf: ["appearance.manage"] },
   { prefix: "/admin/settings", anyOf: ["settings.manage"] },
   { prefix: "/admin/system", anyOf: ["system.view"] },
+  { prefix: "/admin/activity", anyOf: ["activity.view"] },
 ];
 
 export function permissionsForPath(pathname: string): Permission[] {

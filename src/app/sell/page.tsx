@@ -11,12 +11,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, CONTAINER, PageHero } from "@/components/ui/page";
-import { BRANDS, CONDITIONS, FUELS, MORE_MAKES, TRANSMISSIONS } from "@/components/home/data";
+import { BRANDS, CONDITIONS, MORE_MAKES, TRANSMISSIONS } from "@/components/home/data";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { cn, formatLakh, formatTaka } from "@/lib/utils";
 import { validateImageFile } from "@/lib/image-upload";
 import { uploadFile, usePhotoUploads } from "@/lib/upload-client";
 import { ContactNumbersPrompt } from "@/components/ContactNumbersPrompt";
+import { FuelPicker } from "@/components/FuelPicker";
+import { isStaffRole } from "@/lib/permissions";
 
 const MAKES = [...new Set([...BRANDS.map((b) => b.name), ...MORE_MAKES, "Subaru"])].sort((a, b) => a.localeCompare(b));
 const FEATURE_OPTIONS = [
@@ -26,7 +28,10 @@ const FEATURE_OPTIONS = [
 const STEPS = ["Car details", "Price & story", "Photos & papers"];
 
 export default function SellCarPage() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  // Admins and moderators post cars for different owners, so each car can carry its own numbers.
+  const isStaff = isStaffRole((session?.user as { role?: string } | undefined)?.role);
+  const [contact, setContact] = useState({ phone: "", whatsapp: "", whatsappSame: true });
   const { settings } = useSiteSettings();
   const maxPhotos = settings.maxImagesPerListing || 10;
   const [step, setStep] = useState(1);
@@ -48,7 +53,7 @@ export default function SellCarPage() {
 
   const [form, setForm] = useState({
     make: "", model: "", year: "", price: "", mileage: "", condition: "used", description: "",
-    fuelType: "petrol", transmission: "automatic", engineSize: "", color: "", location: "Dhaka", features: [] as string[],
+    fuelTypes: ["petrol"] as string[], transmission: "automatic", engineSize: "", color: "", location: "Dhaka", features: [] as string[],
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -132,6 +137,7 @@ export default function SellCarPage() {
         engineSize: Number(form.engineSize || 1500),
         images,
         documents,
+        ...(isStaff ? { contactPhone: contact.phone, contactWhatsApp: contact.whatsappSame ? contact.phone : contact.whatsapp } : {}),
       }, { timeout: 60_000 });
       setResult({ status: res.data.status || res.data.listing?.status || "active", slug: res.data.listing?.slug });
       setStep(4);
@@ -204,11 +210,8 @@ export default function SellCarPage() {
                         {CONDITIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label htmlFor="s-fuel" className="field-label">Fuel</label>
-                      <select id="s-fuel" className="field" value={form.fuelType} onChange={set("fuelType")}>
-                        {FUELS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                      </select>
+                    <div className="md:col-span-2">
+                      <FuelPicker value={form.fuelTypes} onChange={(fuelTypes) => setForm((f) => ({ ...f, fuelTypes }))} />
                     </div>
                     <div>
                       <label htmlFor="s-gear" className="field-label">Transmission</label>
@@ -252,6 +255,28 @@ export default function SellCarPage() {
                       <label htmlFor="s-location" className="field-label">Where is the car?</label>
                       <input id="s-location" className="field" placeholder="e.g. Gulshan, Dhaka" value={form.location} onChange={set("location")} maxLength={120} />
                     </div>
+                    {isStaff && (
+                      <fieldset className="space-y-3 rounded-2xl border border-hairline p-4 md:col-span-2">
+                        <legend className="px-1 text-sm font-bold">Contact numbers for this car <span className="font-normal text-slate-text">(staff only, optional)</span></legend>
+                        <p className="text-[13px] text-slate-text">Buyers will call these numbers for this car. Leave empty to use your account&apos;s numbers.</p>
+                        <div>
+                          <label htmlFor="s-contact-phone" className="field-label">Phone number</label>
+                          <input id="s-contact-phone" type="tel" inputMode="tel" className="field" placeholder="01712 345678" maxLength={25}
+                            value={contact.phone} onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))} />
+                        </div>
+                        <label className="flex cursor-pointer items-center gap-3 text-sm">
+                          <input type="checkbox" checked={contact.whatsappSame} onChange={(e) => setContact((c) => ({ ...c, whatsappSame: e.target.checked }))} className="size-4 accent-electric" />
+                          Use the same number for WhatsApp
+                        </label>
+                        {!contact.whatsappSame && (
+                          <div>
+                            <label htmlFor="s-contact-wa" className="field-label">WhatsApp number</label>
+                            <input id="s-contact-wa" type="tel" inputMode="tel" className="field" placeholder="01712 345678" maxLength={25}
+                              value={contact.whatsapp} onChange={(e) => setContact((c) => ({ ...c, whatsapp: e.target.value }))} />
+                          </div>
+                        )}
+                      </fieldset>
+                    )}
                     <div className="md:col-span-2">
                       <label htmlFor="s-desc" className="field-label">Description <span className="text-destructive">*</span></label>
                       <textarea id="s-desc" rows={5} className="field resize-y" maxLength={5000} value={form.description} onChange={set("description")}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { changedFields, logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { Blog } from "@/lib/models/Blog";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       Date.now().toString(36);
 
     const blog = await Blog.create({ ...body, slug });
+    await logActivity(auth.session, { action: "blog.create", summary: `Wrote blog post “${blog.title}”`, targetId: String(blog._id), targetLabel: blog.title }, req);
     return NextResponse.json({ success: true, blog }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -51,7 +53,8 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, ...update } = body;
     await connectToDatabase();
-    await Blog.findByIdAndUpdate(id, update);
+    const post = (await Blog.findByIdAndUpdate(id, update, { new: true }).select("title").lean()) as { title?: string } | null;
+    if (post) await logActivity(auth.session, { action: "blog.update", summary: `Edited blog post “${post.title}”`, targetId: String(id), targetLabel: post.title, details: { fields: changedFields(update) } }, req);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -65,7 +68,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json();
     await connectToDatabase();
-    await Blog.findByIdAndDelete(id);
+    const post = (await Blog.findByIdAndDelete(id).select("title").lean()) as { title?: string } | null;
+    if (post) await logActivity(auth.session, { action: "blog.delete", summary: `Deleted blog post “${post.title}”`, targetId: String(id), targetLabel: post.title }, req);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

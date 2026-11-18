@@ -38,15 +38,19 @@ export async function GET(req: Request) {
       );
     }
 
+    // Numbers set on the car itself (by staff) win over the seller account's numbers.
+    const phone = listing.contactPhone || (seller.allowPhoneDisplay ? seller.phone : null) || null;
+    const whatsappNumber = listing.contactWhatsApp || (seller.allowWhatsApp ? seller.whatsappNumber : null) || null;
+
     return NextResponse.json({
       seller: {
         name: seller.name,
         role: seller.role,
         avatar: seller.avatar || null,
-        phone: seller.allowPhoneDisplay ? seller.phone : null,
-        showPhone: seller.allowPhoneDisplay && !!seller.phone,
-        whatsappNumber: seller.allowWhatsApp ? seller.whatsappNumber : null,
-        showWhatsApp: seller.allowWhatsApp && !!seller.whatsappNumber,
+        phone,
+        showPhone: !!phone,
+        whatsappNumber,
+        showWhatsApp: !!whatsappNumber,
       },
     });
   } catch (error: any) {

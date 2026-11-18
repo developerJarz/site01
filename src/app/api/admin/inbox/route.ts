@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logActivity, plural } from "@/lib/activity";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { ContactMessage } from "@/lib/models/ContactMessage";
@@ -62,6 +63,11 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.note === "string") update.note = body.note.slice(0, 2000);
     await connectToDatabase();
     const result = await ContactMessage.updateMany({ _id: { $in: ids } }, { $set: update });
+    await logActivity(auth.session, {
+      action: "inbox.update",
+      summary: update.status ? `Marked ${plural(ids.length, "message")} as ${update.status}` : `Added a note to ${plural(ids.length, "message")}`,
+      targetId: ids.join(","),
+    }, req);
     return NextResponse.json({ success: true, modified: result.modifiedCount });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -78,6 +84,7 @@ export async function DELETE(req: NextRequest) {
     if (!ids.length) return NextResponse.json({ error: "No messages selected" }, { status: 400 });
     await connectToDatabase();
     const result = await ContactMessage.deleteMany({ _id: { $in: ids } });
+    await logActivity(auth.session, { action: "inbox.delete", summary: `Deleted ${plural(result.deletedCount, "message")}`, targetId: ids.join(",") }, req);
     return NextResponse.json({ success: true, deleted: result.deletedCount });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

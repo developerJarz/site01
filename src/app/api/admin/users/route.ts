@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logActivity, plural } from "@/lib/activity";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
       city: text(body.city, 60),
       dealershipName: text(body.dealershipName, 120),
     });
+    await logActivity(auth.session, { action: "user.create", summary: `Created account for ${name} (${role})`, targetId: user._id.toString(), targetLabel: email }, req);
     return NextResponse.json({ success: true, id: user._id.toString(), ...(given ? {} : { temporaryPassword: password }) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -187,8 +189,16 @@ export async function DELETE(req: NextRequest) {
     await connectToDatabase();
     const blocked = await guardTeamTargets(ids, auth.role, auth.can("roles.manage"));
     if (blocked) return NextResponse.json({ error: blocked }, { status: 403 });
+    const gone = (await User.find({ _id: { $in: ids } }).select("name email").lean()) as { name?: string; email?: string }[];
     await retireUsersContent(ids);
     const result = await User.deleteMany({ _id: { $in: ids } });
+    await logActivity(auth.session, {
+      action: "user.delete",
+      summary: gone.length === 1 ? `Deleted account ${gone[0].name || gone[0].email}` : `Deleted ${plural(ids.length, "account")}`,
+      targetId: ids.join(","),
+      targetLabel: gone.slice(0, 5).map((u) => u.email).join(", "),
+      details: { accounts: gone.slice(0, 50).map((u) => u.email) },
+    }, req);
     return NextResponse.json({ success: true, deleted: result.deletedCount });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -269,6 +279,21 @@ export async function PATCH(req: NextRequest) {
     }
 
     const result = await User.updateMany({ _id: { $in: ids } }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
+    const who = ids.length === 1 ? ((await User.findById(ids[0]).select("name email").lean()) as { name?: string; email?: string } | null) : null;
+    const target = who ? who.name || who.email : plural(ids.length, "account");
+    const what = update.role ? `Changed role of ${target} to ${update.role}`
+      : update.status === "suspended" ? `Suspended ${target}`
+      : update.status === "active" ? `Reactivated ${target}`
+      : update.isVerified === true ? `Verified ${target}`
+      : update.isVerified === false ? `Removed verification from ${target}`
+      : `Edited ${target}`;
+    await logActivity(auth.session, {
+      action: update.role ? "user.role" : update.status ? "user.status" : "user.update",
+      summary: what,
+      targetId: ids.join(","),
+      targetLabel: who?.email || "",
+      details: { fields: Object.keys(update), ...(update.suspendedReason ? { reason: update.suspendedReason } : {}) },
+    }, req);
     return NextResponse.json({ success: true, modified: result.modifiedCount });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

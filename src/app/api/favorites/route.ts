@@ -29,7 +29,7 @@ export async function GET() {
     const favorites = await Favorite.find({ userId }).select("listingId").sort({ createdAt: -1 }).lean();
     const ids = favorites.map((favorite) => String(favorite.listingId));
     const cars = await Listing.find({ _id: { $in: ids }, status: { $in: ["active", "sold"] } })
-      .select({ title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1,
+      .select({ title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1, fuelTypes: 1,
         transmission: 1, condition: 1, location: 1, featured: 1, paperVerified: 1, status: 1,
         sellerId: 1, images: { $slice: 1 } })
       .populate<{ sellerId: { name: string; role: string; isVerified: boolean; dealershipName?: string } | null }>("sellerId", "name role isVerified dealershipName")

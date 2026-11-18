@@ -1,86 +1,86 @@
-# Graph Report - carhat  (2026-10-17)
+# Graph Report - carhat  (2026-11-18)
 
 ## Corpus Check
-- 378 files · ~412,763 words
+- 384 files · ~422,563 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 52 file(s) not represented in the graph (top: .csv 37, .ttf 9, (none) 3)
 
 ## Summary
-- 2590 nodes · 6516 edges · 200 communities (119 shown, 81 thin omitted)
+- 2644 nodes · 6788 edges · 196 communities (119 shown, 77 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 57 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `90fa7e7f`
+- Built from commit: `3ed99c04`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- about/page.tsx
-- roles/page.tsx
-- upload/route.ts
-- cn
-- validate_data.py
 - app/page.tsx
+- AdminShell.tsx
+- upload/route.ts
+- TrafficDashboard.tsx
+- validate_data.py
+- Listing.ts
 - core.py
-- [brand]/page.tsx
+- seo.ts
 - site-config.ts
-- users/route.ts
-- stats/route.ts
+- permissions.ts
+- admin/listings/route.ts
 - design_system.py
-- system/route.ts
-- db.ts
-- data.ts
-- appearance/page.tsx
-- search
+- [filename]/route.ts
+- formatLakh
+- cars/page.tsx
+- cn
+- cars/[slug]/page.tsx
 - search_stack
 - Data Loading Principles and Patterns
-- ui/page.tsx
-- signup.ts
-- cars/[slug]/page.tsx
+- lucide-react
+- contact-details.ts
+- seo-text.ts
 - connectToDatabase
-- [filename]/route.ts
-- buildMetadata
+- sell/page.tsx
+- next
 - DesignSystemGenerator
 - test_design_system_mode.py
 - dependencies
-- seo/page.tsx
+- favorites/route.ts
 - Medusa Admin Dashboard Customizations
 - package.json
-- seo.ts
+- sanitizeAppearance
 - utils.ts
 - BM25
 - _style_is_dark_primary
-- profile/page.tsx
-- next
+- react
+- next-auth
 - Navigation and Routing
 - compilerOptions
 - Default Open Graph Share Card (og-default.jpg)
-- favorites/route.ts
+- db.ts
 - watermark.ts
 - admin/page.tsx
 - test_skill_script_paths.py
 - components.json
-- Button
+- operations.ts
 - Part B Semantic Extraction (Subagents)
 - detect_domain
 - Displaying Entities - Patterns and Components
 - CatalogRefreshTest
 - graphify Full Pipeline
-- users/page.tsx
-- operations.ts
+- listings/page.tsx
+- index.ts
 - graph.json
 - --update Incremental Re-extraction
 - devDependencies
-- sell/page.tsx
+- seo/page.tsx
 - app/layout.tsx
 - scripts
 - UI/UX Pro Max - Design Intelligence
 - graphify SKILL.md
 - graphify query reference
 - migrate-images-to-cloudinary.mjs
-- TestThresholdGate
-- generate_design_system
+- test_catalog_summary_line_endings.py
+- admin/settings/route.ts
 - 5. Re-render Optimization
 - TestTextLayoutDataContracts
 - create-next-app Boilerplate Assets
@@ -98,14 +98,14 @@
 - Headless CMS Guide
 - 6. Rendering Performance
 - 3. Server-Side Performance
-- seo-text.ts
+- Navbar.tsx
 - Forms and Modal Patterns
 - React Best Practices
 - Sections
 - Homepage Vehicle Category Tiles (body-type browse grid)
-- Showcases.tsx
+- ref_node_assert
 - Table Selection Pattern
-- AiAssistant.tsx
+- car-intent.ts
 - Complete Examples
 - Key Implementation Details
 - Content Ideation Sources
@@ -120,10 +120,10 @@
 - Before Planning
 - Keyword Research by Buyer Stage
 - 8. Advanced Patterns
-- dashboard/page.tsx
+- MarketplacePanels.tsx
 - Content Modeling for Marketing
 - Output Format
-- Content Types
+- api/newsletter/route.ts
 - async-cheap-condition-before-await.md
 - Prefer Statically Analyzable Paths
 - server-hoist-static-io.md
@@ -195,36 +195,32 @@
 - _template.md
 - CLAUDE.md
 - Sell Banner Photo (black Range Rover Sport in front of garage)
-- reports/page.tsx
-- .generate
+- settings/page.tsx
+- CarsContent
 - image-processing.ts
-- api/newsletter/route.ts
-- seo-score.ts
-- AdminShell.tsx
+- ui.tsx
 - contact-request.ts
-- SiteSettingsContext.tsx
-- next-auth
-- FONTS.md
+- Footer.tsx
 - listing-input.ts
-- Reveal
-- ref_node_assert
-- CatalogSummaryLineEndingsTest
-- split_values
-- parseFavoriteMutation
-- TestMetricMath
-- system/page.tsx
-- TestFixtureValidation
+- site-settings.ts
+- isStaffRole
+- FONTS.md
+- dashboard/page.tsx
+- Reviews.tsx
+- buildListingQuery
+- SiteSettingsContext.tsx
+- Content Pillars and Topic Clusters
 
 ## God Nodes (most connected - your core abstractions)
-1. `cn()` - 190 edges
-2. `connectToDatabase()` - 141 edges
-3. `next` - 128 edges
-4. `lucide-react` - 76 edges
-5. `react` - 68 edges
+1. `cn()` - 196 edges
+2. `connectToDatabase()` - 145 edges
+3. `next` - 129 edges
+4. `lucide-react` - 78 edges
+5. `react` - 69 edges
 6. `Button()` - 68 edges
-7. `requireAdmin()` - 54 edges
-8. `formatLakh()` - 48 edges
-9. `Button()` - 44 edges
+7. `requireAdmin()` - 56 edges
+8. `Button()` - 48 edges
+9. `formatLakh()` - 48 edges
 10. `search()` - 43 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -232,12 +228,12 @@
   .agents/skills/vercel-react-best-practices/AGENTS.md → src/app/admin/users/page.tsx
 - `Don't Define Components Inside Components` --references--> `Avatar()`  [INFERRED]
   .agents/skills/vercel-react-best-practices/rules/rerender-no-inline-components.md → src/app/admin/users/page.tsx
-- `SEO Fields Checklist` --references--> `slug()`  [INFERRED]
-  .agents/skills/content-strategy/references/headless-cms.md → src/app/faq/page.tsx
 - `3. Navigate to Your Custom UI` --references--> `label()`  [INFERRED]
   .agents/skills/building-admin-dashboard-customizations/SKILL.md → src/app/cars/[slug]/page.tsx
 - `Widget vs UI Route` --references--> `label()`  [INFERRED]
   .agents/skills/building-admin-dashboard-customizations/SKILL.md → src/app/cars/[slug]/page.tsx
+- `SEO Fields Checklist` --references--> `slug()`  [INFERRED]
+  .agents/skills/content-strategy/references/headless-cms.md → src/app/faq/page.tsx
 
 ## Import Cycles
 - None detected.
@@ -252,123 +248,123 @@
 - **Graph Auto-Rebuild Triggers** — _claude_skills_graphify_references_add_watch_watch_mode, _claude_skills_graphify_references_hooks_post_commit_hook, _claude_skills_graphify_references_update_incremental_update, _claude_skills_graphify_references_update_code_only_path [INFERRED 0.85]
 - **Unused Next.js Starter Icons** — public_file_icon, public_globe_icon, public_next_logo, public_vercel_logo, public_window_icon [INFERRED 0.85]
 
-## Communities (200 total, 81 thin omitted)
+## Communities (196 total, 77 thin omitted)
 
-### Community 0 - "about/page.tsx"
-Cohesion: 0.13
-Nodes (26): AUDIENCES, CITIES, FEATURE_ICONS, generateMetadata(), revalidate, STAT_ICONS, CategoryGrid(), BRANDS (+18 more)
+### Community 0 - "app/page.tsx"
+Cohesion: 0.10
+Nodes (46): framer-motion, BANDS, BODY_TABS, BUDGET_BUCKETS, CARD_FIELDS, CarDoc, getHomeData(), Home() (+38 more)
 
-### Community 1 - "roles/page.tsx"
-Cohesion: 0.15
-Nodes (11): Draft, FragmentRows(), PermissionInfo, Role, ROLE_TINT, RolesResponse, ToastApi, ToastContext (+3 more)
+### Community 1 - "AdminShell.tsx"
+Cohesion: 0.18
+Nodes (16): AdminLayout(), metadata, AdminProvider(), AdminShell(), AlertsMenu(), ALL_ITEMS, CommandPalette(), Counts (+8 more)
 
 ### Community 2 - "upload/route.ts"
-Cohesion: 0.13
-Nodes (25): ref_node_crypto, dynamic, maxDuration, runtime, saveDocumentLocally(), SITE_IMAGE_PERMISSIONS, DELETE(), dynamic (+17 more)
+Cohesion: 0.15
+Nodes (24): dynamic, maxDuration, POST(), runtime, saveDocumentLocally(), SITE_IMAGE_PERMISSIONS, DELETE(), dynamic (+16 more)
 
-### Community 3 - "cn"
-Cohesion: 0.09
-Nodes (52): recharts, BarList(), CategoryTick(), ColumnChart(), DonutChart(), GroupedBars(), LineChart(), longDate() (+44 more)
+### Community 3 - "TrafficDashboard.tsx"
+Cohesion: 0.08
+Nodes (50): recharts, ColumnChart(), DonutChart(), GroupedBars(), LineChart(), longDate(), num(), OTHER_COLOR (+42 more)
 
 ### Community 4 - "validate_data.py"
 Cohesion: 0.07
-Nodes (51): Semantic quality contracts for the core UI/UX datasets., read_rows(), TestAccessibilityGuidance, TestChartsTypographyAndIcons, TestCurrentReactGuidance, TestSemanticColors, _catalog_date(), _check_app_interface_contract() (+43 more)
+Nodes (49): Semantic quality contracts for the core UI/UX datasets., read_rows(), TestAccessibilityGuidance, TestChartsTypographyAndIcons, TestCurrentReactGuidance, TestSemanticColors, _catalog_date(), _check_app_interface_contract() (+41 more)
 
-### Community 5 - "app/page.tsx"
-Cohesion: 0.11
-Nodes (26): dynamic, GET(), SellerDoc, SORTS, BANDS, BODY_TABS, BUDGET_BUCKETS, CARD_FIELDS (+18 more)
+### Community 5 - "Listing.ts"
+Cohesion: 0.12
+Nodes (19): dynamic, GET(), GET(), SAFE_TYPES, dynamic, GET(), SellerDoc, SORTS (+11 more)
 
 ### Community 6 - "core.py"
-Cohesion: 0.07
-Nodes (45): _contains_phrase(), _domain_keywords(), _exact_match_diagnostic(), _exact_row_identity(), _file_signature(), _get_bm25(), _legacy_successor_guidance(), _load_csv() (+37 more)
+Cohesion: 0.04
+Nodes (54): _contains_phrase(), _domain_keywords(), _exact_match_diagnostic(), _exact_row_identity(), _file_signature(), _get_bm25(), _legacy_successor_guidance(), _load_csv() (+46 more)
 
-### Community 7 - "[brand]/page.tsx"
-Cohesion: 0.12
-Nodes (32): AboutPage(), brandFaq(), BrandPage(), CARD_FIELDS, generateMetadata(), loadBrand(), Props, revalidate (+24 more)
+### Community 7 - "seo.ts"
+Cohesion: 0.06
+Nodes (59): contentAudit(), dynamic, editablePages(), GET(), LIMITS, PAGE_FIELDS, brandFaq(), BrandPage() (+51 more)
 
 ### Community 8 - "site-config.ts"
-Cohesion: 0.08
-Nodes (46): ref_node_fs, appearanceUpdate(), dynamic, GET(), PATCH(), settingsUpdate(), text(), GET() (+38 more)
-
-### Community 9 - "users/route.ts"
-Cohesion: 0.10
-Nodes (39): dynamic, GET(), PATCH(), widgetList(), DELETE(), dynamic, GET(), isBuiltIn() (+31 more)
-
-### Community 10 - "stats/route.ts"
 Cohesion: 0.09
-Nodes (31): dailySeries(), dynamic, GET(), perDay(), withThumb(), dynamic, GET(), dynamic (+23 more)
+Nodes (28): AnnouncementTone, AppPromoConfig, brandPalette(), CarFilterMode, CarSortOption, contrastOnWhite(), DEFAULT_WATERMARK, FaqItem (+20 more)
+
+### Community 9 - "permissions.ts"
+Cohesion: 0.13
+Nodes (29): dynamic, GET(), PATCH(), widgetList(), DELETE(), dynamic, GET(), isBuiltIn() (+21 more)
+
+### Community 10 - "admin/listings/route.ts"
+Cohesion: 0.14
+Nodes (18): BULK_FIELDS, describeListingChange(), dynamic, EDITABLE_FIELDS, GET(), PAPER_FIELDS, SORTS, STATUSES (+10 more)
 
 ### Community 11 - "design_system.py"
+Cohesion: 0.06
+Nodes (51): _detect_page_type(), format_page_override_md(), generate_design_system(), _generate_intelligent_overrides(), persist_design_system(), Persist design system to design-system/<project>/ folder using Master +…, Format a page-specific override file with intelligent AI-generated content., Generate intelligent overrides based on page type using layered search. Uses… (+43 more)
+
+### Community 12 - "[filename]/route.ts"
+Cohesion: 0.22
+Nodes (7): Uploaded Image 1782323677351 (GWR train at station platform; not a car), Uploaded Image 1782323677829 (US one-dollar bill on wood; not a car), Local Uploads Directory Media (served via /uploads/[filename]), ref_fs, ref_path, dynamic, MIME_TYPES
+
+### Community 13 - "formatLakh"
+Cohesion: 0.25
+Nodes (17): @radix-ui/react-tabs, CarImage(), AiAssistant(), FeedList(), BentoCard(), BodyTypeShowcase(), BudgetPicks(), carName() (+9 more)
+
+### Community 14 - "cars/page.tsx"
 Cohesion: 0.08
-Nodes (36): Design System Generator - Aggregates search results and applies reasoning to…, apply_decision_rules(), _object_without_duplicates(), parse_decision_rules(), Return deterministic mutations and an audit trail; never execute data., Closed, non-executable grammar for design-system decision rules., Parse the canonical condition -> action-array representation., _validate_action() (+28 more)
+Nodes (33): Car Brand Logos, Audi logo (four interlocking rings, monochrome), BMW logo (blue roundel with quartered circle), Honda logo (red HONDA wordmark), Hyundai logo (navy italic HYUNDAI wordmark), Kia logo (dark KIA wordmark), Lexus logo (spaced LEXUS wordmark), Mazda logo (MAZDA wordmark) (+25 more)
 
-### Community 12 - "system/route.ts"
-Cohesion: 0.17
-Nodes (12): mongoose, dynamic, dynamic, dynamic, Blog, BlogSchema, IBlog, ContactMessage (+4 more)
-
-### Community 13 - "db.ts"
-Cohesion: 0.09
-Nodes (28): dynamic, dynamic, GET(), SAFE_TYPES, DEMO_CARS, dynamic, dynamic, dynamic (+20 more)
-
-### Community 14 - "data.ts"
+### Community 15 - "cn"
 Cohesion: 0.10
-Nodes (28): Car Brand Logos, Audi logo (four interlocking rings, monochrome), BMW logo (blue roundel with quartered circle), Honda logo (red HONDA wordmark), Hyundai logo (navy italic HYUNDAI wordmark), Kia logo (dark KIA wordmark), Lexus logo (spaced LEXUS wordmark), Mazda logo (MAZDA wordmark) (+20 more)
+Nodes (50): AppearancePage(), Brand, BRAND_COLORS, BrandTab(), CAR_SECTIONS, CATEGORIES, FaqEditor(), FaviconCheck() (+42 more)
 
-### Community 15 - "appearance/page.tsx"
-Cohesion: 0.10
-Nodes (44): AppearancePage(), Brand, BRAND_COLORS, BrandTab(), FaqEditor(), FaviconCheck(), FooterTab(), Form (+36 more)
-
-### Community 16 - "search"
-Cohesion: 0.09
-Nodes (9): Resolve a deprecated in-domain alias, or expose a cross-domain redirect., Main search function with auto-domain detection, search(), _style_search_destination(), TestDiagnosticsContracts, TestSearchDomains, read_rows(), TestStyleTaxonomy (+1 more)
+### Community 16 - "cars/[slug]/page.tsx"
+Cohesion: 0.14
+Nodes (24): CARD_FIELDS, CarDetailsPage(), dynamic, getCar, CarActions(), CarGallery(), optimisable(), CarCard() (+16 more)
 
 ### Community 17 - "search_stack"
-Cohesion: 0.10
-Nodes (10): _exact_stack_identifier(), Resolve a standalone API identifier even when its BM25 IDF is low., Search stack-specific guidelines, search_stack(), _rows(), TestNativeDesktopStackFreshness, Freshness and generation-isolation contracts for web stack guidance., _rows() (+2 more)
+Cohesion: 0.09
+Nodes (9): _exact_stack_identifier(), Resolve a standalone API identifier even when its BM25 IDF is low., Search stack-specific guidelines, search_stack(), TestDiagnosticsContracts, _rows(), TestNativeDesktopStackFreshness, _rows() (+1 more)
 
 ### Community 18 - "Data Loading Principles and Patterns"
 Cohesion: 0.05
 Nodes (36): Authentication/Authorization errors when fetching data, Basic Mutation, Basic Query, Cache Invalidation Guidelines, Common Issues & Solutions, Common Mistake vs Correct Pattern, Common Patterns, Complete Example: Widget with Separate Queries (+28 more)
 
-### Community 19 - "ui/page.tsx"
-Cohesion: 0.16
-Nodes (19): BlogArchivePage(), revalidate, TagLink(), Contact(), ContactForm(), DealersPage(), FAQS, revalidate (+11 more)
+### Community 19 - "lucide-react"
+Cohesion: 0.09
+Nodes (34): lucide-react, AboutPage(), AUDIENCES, CITIES, FEATURE_ICONS, revalidate, STAT_ICONS, Blog (+26 more)
 
-### Community 20 - "signup.ts"
-Cohesion: 0.12
-Nodes (24): bcryptjs, ref_crypto, nodemailer, POST(), POST(), POST(), POST(), ContactDetails (+16 more)
+### Community 20 - "contact-details.ts"
+Cohesion: 0.08
+Nodes (39): bcryptjs, ref_crypto, nodemailer, AdminContactNumbers(), POST(), POST(), POST(), POST() (+31 more)
 
-### Community 21 - "cars/[slug]/page.tsx"
-Cohesion: 0.19
-Nodes (19): CARD_FIELDS, CarDetailsPage(), dynamic, getCar, CarActions(), ShareButton(), CarCard(), CarCardData (+11 more)
+### Community 21 - "seo-text.ts"
+Cohesion: 0.30
+Nodes (17): EditListing(), generateMetadata(), generateMetadata(), autoListingDescription(), autoListingTitle(), CarLike, carName(), cityOf() (+9 more)
 
 ### Community 22 - "connectToDatabase"
-Cohesion: 0.09
-Nodes (39): DELETE(), dynamic, GET(), PATCH(), POST(), DELETE(), dynamic, GET() (+31 more)
+Cohesion: 0.10
+Nodes (49): dynamic, GET(), DELETE(), dynamic, GET(), PATCH(), POST(), DELETE() (+41 more)
 
-### Community 23 - "[filename]/route.ts"
-Cohesion: 0.22
-Nodes (7): Uploaded Image 1782323677351 (GWR train at station platform; not a car), Uploaded Image 1782323677829 (US one-dollar bill on wood; not a car), Local Uploads Directory Media (served via /uploads/[filename]), ref_fs, ref_path, dynamic, MIME_TYPES
+### Community 23 - "sell/page.tsx"
+Cohesion: 0.20
+Nodes (13): FEATURE_OPTIONS, MAKES, SellCarPage(), StepActions(), STEPS, FuelPicker(), PhotoStatus, PhotoUpload (+5 more)
 
-### Community 24 - "buildMetadata"
-Cohesion: 0.08
-Nodes (25): generateMetadata(), BlogPostPage(), dynamic, generateMetadata(), getPost, generateMetadata(), generateMetadata(), generateMetadata() (+17 more)
+### Community 24 - "next"
+Cohesion: 0.06
+Nodes (24): nextConfig, next, generateMetadata(), generateMetadata(), generateMetadata(), generateMetadata(), metadata, FAQS (+16 more)
 
 ### Community 25 - "DesignSystemGenerator"
-Cohesion: 0.08
-Nodes (11): DesignSystemGenerator, Generates design system recommendations from aggregated searches., Load reasoning rules from CSV., Find matching reasoning rule for a category., Apply reasoning rules to search results., Select best matching result based on priority keywords., TestReasoningMatch, read_rows() (+3 more)
+Cohesion: 0.06
+Nodes (18): DesignSystemGenerator, Generates design system recommendations from aggregated searches., Load reasoning rules from CSV., Execute searches across multiple domains., Find matching reasoning rule for a category., Select best matching result based on priority keywords., Extract results list from search result dict., Generate complete design system recommendation. variance/motion/density are… (+10 more)
 
 ### Community 26 - "test_design_system_mode.py"
-Cohesion: 0.06
-Nodes (35): ansi_ljust(), _button_outline_text_color(), _contrast_ratio(), _derive_dark_palette(), format_ascii_box(), add_wrapped(), wrap_text(), format_markdown() (+27 more)
+Cohesion: 0.05
+Nodes (38): ansi_ljust(), _button_outline_text_color(), _contrast_ratio(), _derive_dark_palette(), _filter_anti_patterns_for_mode(), format_ascii_box(), add_wrapped(), wrap_text() (+30 more)
 
 ### Community 27 - "dependencies"
 Cohesion: 0.08
 Nodes (25): dependencies, axios, bcryptjs, class-variance-authority, cloudinary, clsx, framer-motion, @hookform/resolvers (+17 more)
 
-### Community 28 - "seo/page.tsx"
-Cohesion: 0.17
-Nodes (19): Audit, CheckList(), Defaults, EMPTY, EMPTY_REVIEW, Globals, HealthReport(), Meter() (+11 more)
+### Community 28 - "favorites/route.ts"
+Cohesion: 0.24
+Nodes (10): currentUserId(), DELETE(), dynamic, failure(), GET(), POST(), GET(), FavoriteRequestError (+2 more)
 
 ### Community 29 - "Medusa Admin Dashboard Customizations"
 Cohesion: 0.07
@@ -376,15 +372,15 @@ Nodes (28): 1. Data Loading (CRITICAL), 1. Start the Development Server, 2. Acce
 
 ### Community 30 - "package.json"
 Cohesion: 0.08
-Nodes (23): name, private, version, class-variance-authority, clsx, @hookform/resolvers, @radix-ui/react-dialog, @radix-ui/react-slot (+15 more)
+Nodes (23): name, private, version, axios, class-variance-authority, clsx, @hookform/resolvers, @radix-ui/react-dialog (+15 more)
 
-### Community 31 - "seo.ts"
-Cohesion: 0.10
-Nodes (33): contentAudit(), dynamic, editablePages(), GET(), isImageUrl(), LIMITS, PAGE_FIELDS, PATCH() (+25 more)
+### Community 31 - "sanitizeAppearance"
+Cohesion: 0.32
+Nodes (13): intIn(), links(), obj(), pick(), safeHref(), safeImageUrl(), sanitizeAppearance(), sanitizeAppPromo() (+5 more)
 
 ### Community 32 - "utils.ts"
-Cohesion: 0.10
-Nodes (28): lucide-react, react, Blog, emptyForm, ChatMessage, Conversation, MessagesContent(), MessagesPage() (+20 more)
+Cohesion: 0.17
+Nodes (13): GET(), CarImageProps, EASE, HeroSection(), rollKeyframes(), LiveListings(), TONES, NavSearch() (+5 more)
 
 ### Community 33 - "BM25"
 Cohesion: 0.13
@@ -394,13 +390,13 @@ Nodes (8): BM25, BM25 ranking algorithm for text search, Lowercase, normalize sy
 Cohesion: 0.21
 Nodes (7): _query_wants_dark(), True when a styles.csv row describes itself as dark-first., True when the query explicitly asks for a dark theme., Resolve the mode the rest of the output has to agree with., _resolve_color_mode(), _style_is_dark_primary(), TestModeResolution
 
-### Community 35 - "profile/page.tsx"
+### Community 35 - "react"
 Cohesion: 0.16
-Nodes (28): AdminContactNumbers(), Card(), EMPTY, Field(), formFromProfile(), Profile, ProfilePage(), Toggle() (+20 more)
+Nodes (26): react, Error(), ForgotPasswordPage(), post(), LoginForm(), LoginPage(), MESSAGES, NotFound() (+18 more)
 
-### Community 36 - "next"
-Cohesion: 0.09
-Nodes (12): nextConfig, next, dynamic, GET(), dynamic, GET(), metadata, metadata (+4 more)
+### Community 36 - "next-auth"
+Cohesion: 0.13
+Nodes (20): next-auth, handler, dynamic, dynamic, dynamic, POST(), dynamic, dynamic (+12 more)
 
 ### Community 37 - "Navigation and Routing"
 Cohesion: 0.08
@@ -414,17 +410,17 @@ Nodes (19): compilerOptions, allowImportingTsExtensions, allowJs, esModuleIntero
 Cohesion: 0.40
 Nodes (5): CarHat Brand Identity (teal-to-blue gradient wordmark with SUV in C and top-down car as H), CarHat BD Logo (car-hat-bd.png), Hero Photo (white BMW M5 in motion), Default Open Graph Share Card (og-default.jpg), Social Share Card Messaging (Buy & sell cars in Bangladesh, Paper Verified, Post your car free)
 
-### Community 40 - "favorites/route.ts"
-Cohesion: 0.57
-Nodes (6): currentUserId(), DELETE(), dynamic, failure(), GET(), POST()
+### Community 40 - "db.ts"
+Cohesion: 0.07
+Nodes (41): mongoose, dailySeries(), dynamic, GET(), perDay(), withThumb(), dynamic, GET() (+33 more)
 
 ### Community 41 - "watermark.ts"
-Cohesion: 0.14
-Nodes (20): drawWatermark(), escapeMarkup(), FONT_DIR, GRAVITY, growShape(), lineShadow(), markCache, PlacedMark (+12 more)
+Cohesion: 0.08
+Nodes (33): ref_node_fs, ref_node_module, ref_node_path, sharp, dynamic, POST(), runtime, SAMPLES (+25 more)
 
 ### Community 42 - "admin/page.tsx"
-Cohesion: 0.14
-Nodes (20): ActionCard(), AdminDashboard(), CONDITION_LABEL, DashboardData, Kpi(), PRICE_PARAMS, RANGES, resolveLayout() (+12 more)
+Cohesion: 0.13
+Nodes (25): ActionCard(), ActivityEntry, AdminDashboard(), CONDITION_LABEL, CustomizeDashboard(), DashboardData, Kpi(), PRICE_PARAMS (+17 more)
 
 ### Community 43 - "test_skill_script_paths.py"
 Cohesion: 0.38
@@ -434,9 +430,9 @@ Nodes (5): Every script invocation in the shipped skill markdown resolves from t
 Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
-### Community 45 - "Button"
-Cohesion: 0.19
-Nodes (20): Error(), ForgotPasswordPage(), post(), LoginForm(), LoginPage(), MESSAGES, NotFound(), post() (+12 more)
+### Community 45 - "operations.ts"
+Cohesion: 0.27
+Nodes (9): cloudinary, cloudinaryUrl, started, ImagePurpose, incomingCompression(), streamUpload(), uploadDocument(), uploadImage() (+1 more)
 
 ### Community 46 - "Part B Semantic Extraction (Subagents)"
 Cohesion: 0.16
@@ -454,13 +450,13 @@ Nodes (22): Card with elevation and hover, Common Class Patterns, Compact List (
 Cohesion: 0.18
 Nodes (14): graphify exports reference, FalkorDB Export, GraphML Export, MCP Stdio Server (graphify.serve), Neo4j Export, SVG Export, Token Reduction Benchmark, Corpus Size Warning (>2M words / >500 files) (+6 more)
 
-### Community 51 - "users/page.tsx"
-Cohesion: 0.10
-Nodes (55): Don't Define Components Inside Components, AdminInboxPage(), InboxManager(), InboxResponse, TABS, AdminListingsPage(), BulkButton(), dataUrlToBlob() (+47 more)
+### Community 51 - "listings/page.tsx"
+Cohesion: 0.11
+Nodes (34): Don't Define Components Inside Components, AdminListingsPage(), BulkButton(), dataUrlToBlob(), Listing, ListingsManager(), ListResponse, PAPER_FILTERS (+26 more)
 
-### Community 52 - "operations.ts"
-Cohesion: 0.21
-Nodes (19): ref_server_only, POST(), checkCloudinaryConnection(), CloudinaryHealthResult, src_lib_cloudinary_client_cloudinary, getCloudinaryClient(), clearConfigCache(), CloudinaryConfigOptions (+11 more)
+### Community 52 - "index.ts"
+Cohesion: 0.23
+Nodes (14): ref_server_only, dynamic, GET(), checkCloudinaryConnection(), CloudinaryHealthResult, src_lib_cloudinary_checkcloudinaryconnection, src_lib_cloudinary_client_cloudinary, getCloudinaryClient() (+6 more)
 
 ### Community 53 - "graph.json"
 Cohesion: 0.23
@@ -474,13 +470,13 @@ Nodes (11): graphify add/watch reference, graphify add (URL ingest), needs_updat
 Cohesion: 0.18
 Nodes (11): devDependencies, eslint, eslint-config-next, tailwindcss, @tailwindcss/postcss, @types/bcryptjs, @types/node, @types/nodemailer (+3 more)
 
-### Community 56 - "sell/page.tsx"
-Cohesion: 0.14
-Nodes (18): axios, Loading(), FEATURE_OPTIONS, MAKES, SellCarPage(), StepActions(), STEPS, CONDITIONS (+10 more)
+### Community 56 - "seo/page.tsx"
+Cohesion: 0.12
+Nodes (26): AdminSeoPage(), Audit, CheckList(), Defaults, EMPTY, EMPTY_REVIEW, Globals, HealthReport() (+18 more)
 
 ### Community 57 - "app/layout.tsx"
-Cohesion: 0.20
-Nodes (17): src_app_globals, jakarta, RootLayout(), viewport, AnnouncementBar(), Footer(), NewsletterForm(), SiteFooter() (+9 more)
+Cohesion: 0.26
+Nodes (11): src_app_globals, generateMetadata(), jakarta, RootLayout(), viewport, AnnouncementBar(), ALWAYS_OPEN, MaintenanceGate() (+3 more)
 
 ### Community 58 - "scripts"
 Cohesion: 0.20
@@ -499,12 +495,16 @@ Cohesion: 0.36
 Nodes (9): graphify query reference, BFS Traversal, DFS Traversal, /graphify explain, /graphify path, Constrained Query Expansion, save-result Feedback Loop, Token Budget (--budget) (+1 more)
 
 ### Community 62 - "migrate-images-to-cloudinary.mjs"
-Cohesion: 0.18
-Nodes (16): cloudinary, cloudinaryUrl, started, APPLY, compress(), configureCloudinary(), kind(), main() (+8 more)
+Cohesion: 0.23
+Nodes (14): ref_node_crypto, APPLY, compress(), configureCloudinary(), kind(), main(), migrateArray(), migrateField() (+6 more)
 
-### Community 64 - "generate_design_system"
-Cohesion: 0.11
-Nodes (16): _detect_page_type(), format_page_override_md(), generate_design_system(), _generate_intelligent_overrides(), persist_design_system(), Persist design system to design-system/<project>/ folder using Master +…, Format a page-specific override file with intelligent AI-generated content., Generate intelligent overrides based on page type using layered search. Uses… (+8 more)
+### Community 63 - "test_catalog_summary_line_endings.py"
+Cohesion: 0.08
+Nodes (11): CatalogSummaryLineEndingsTest, _load_generator(), The catalog snapshot must not depend on the checkout's line endings. Regression…, Simulate a Windows checkout: the recorded hashes must still validate., Unit tests for metric math and relevance fixture validation., TestFixtureValidation, TestMetricMath, TestThresholdGate (+3 more)
+
+### Community 64 - "admin/settings/route.ts"
+Cohesion: 0.35
+Nodes (12): appearanceUpdate(), dynamic, GET(), PATCH(), settingsUpdate(), text(), invalidateSeoCache(), resolveAppearance() (+4 more)
 
 ### Community 65 - "5. Re-render Optimization"
 Cohesion: 0.12
@@ -516,7 +516,7 @@ Nodes (6): create-next-app Boilerplate Assets, File icon (document with folded c
 
 ### Community 69 - "Content Strategy"
 Cohesion: 0.13
-Nodes (15): Calendar Split: 60/30/10, Content Pillars and Topic Clusters, Content Strategy, Create Once, Distribute Twice, How to Identify Pillars, Per-Format Execution Discipline, Pillar Criteria, Pillar Structure (+7 more)
+Nodes (15): Calendar Split: 60/30/10, Content Strategy, Content Types, Create Once, Distribute Twice, Link-Earning Formats, Per-Format Execution Discipline, References, Related Skills (+7 more)
 
 ### Community 70 - "graphify transcribe reference"
 Cohesion: 0.67
@@ -562,9 +562,9 @@ Nodes (12): 6.10 Use React DOM Resource Hints, 6.11 Use useTransition Over Manua
 Cohesion: 0.18
 Nodes (10): 3.10 Use after() for Non-Blocking Operations, 3.1 Authenticate Server Actions Like API Routes, 3.2 Avoid Duplicate Serialization in RSC Props, 3.3 Avoid Shared Module State for Request Data, 3.4 Cross-Request LRU Caching, 3.5 Hoist Static I/O to Module Level, 3.6 Minimize Serialization at RSC Boundaries, 3.7 Parallel Data Fetching with Component Composition (+2 more)
 
-### Community 82 - "seo-text.ts"
-Cohesion: 0.36
-Nodes (14): generateMetadata(), autoListingDescription(), autoListingTitle(), CarLike, carName(), cityOf(), clean(), CONDITION_WORD (+6 more)
+### Community 82 - "Navbar.tsx"
+Cohesion: 0.13
+Nodes (20): CarCardData, IconButton(), MarketplacePanels, MenuItem(), MobileBottomNav(), Navbar(), NavLink, NO_BOTTOM_NAV (+12 more)
 
 ### Community 83 - "Forms and Modal Patterns"
 Cohesion: 0.20
@@ -582,17 +582,17 @@ Nodes (9): 1. Eliminating Waterfalls (async), 2. Bundle Size Optimization (bundl
 Cohesion: 0.20
 Nodes (10): App Promo Car Photo (silver Toyota RAV4, portrait), Electric Category Tile (white Tesla Model Y), Hatchback Category Tile (blue VW Polo), Hybrid Category Tile (grey Toyota Camry), Luxury Category Tile (white Mercedes GLE Coupe), MPV Category Tile (white Ford Expedition), Pickup Category Tile (tan Toyota Tacoma), Sedan Category Tile (white Toyota Corolla) (+2 more)
 
-### Community 87 - "Showcases.tsx"
+### Community 87 - "ref_node_assert"
 Cohesion: 0.28
-Nodes (14): Home(), BentoCard(), BodyTypeShowcase(), BudgetPicks(), carName(), HotDealsRail(), LuxuryBento(), ShowcaseCar (+6 more)
+Nodes (5): ref_node_assert, ref_node_test, valid, valid, good
 
 ### Community 88 - "Table Selection Pattern"
 Cohesion: 0.22
 Nodes (9): Complete Widget Example: Related Products Selection, Contents, For Categories Selection, For Custom Endpoints, For Regions Selection, Important Notes, Pattern Variations, Pre-Implementation Requirements for pnpm (+1 more)
 
-### Community 89 - "AiAssistant.tsx"
-Cohesion: 0.15
-Nodes (17): framer-motion, AiAssistant(), Match, Reply, SUGGESTIONS, AI_DEFAULT, amount(), CarIntent (+9 more)
+### Community 89 - "car-intent.ts"
+Cohesion: 0.21
+Nodes (11): amount(), CarIntent, CATEGORY_WORDS, CITIES, CITY_ALIASES, describeIntent(), FUEL_WORDS, intentToParams() (+3 more)
 
 ### Community 90 - "Complete Examples"
 Cohesion: 0.25
@@ -650,85 +650,81 @@ Nodes (5): Awareness Stage, Consideration Stage, Decision Stage, Implementation 
 Cohesion: 0.40
 Nodes (5): 8.1 Do Not Put Effect Events in Dependency Arrays, 8.2 Initialize App Once, Not Per Mount, 8.3 Store Event Handlers in Refs, 8.4 useEffectEvent for Stable Callback Refs, 8. Advanced Patterns
 
-### Community 104 - "dashboard/page.tsx"
-Cohesion: 0.06
-Nodes (66): CarsContent(), CarsPage(), CategoryChip(), DebouncedInput(), FILTER_KEYS, Filters(), MAKES, ResultsGrid() (+58 more)
+### Community 104 - "MarketplacePanels.tsx"
+Cohesion: 0.21
+Nodes (20): DashboardPage(), PriceDialog(), Shortcut(), Stat(), ComparePanel(), CONDITION, FUEL, GEAR (+12 more)
 
 ### Community 105 - "Content Modeling for Marketing"
-Cohesion: 0.50
-Nodes (4): Common Marketing Content Types, Content Modeling for Marketing, Core Principles, SEO Fields Checklist
+Cohesion: 0.40
+Nodes (5): Common Marketing Content Types, Content Modeling for Marketing, Core Principles, SEO Fields Checklist, slug()
 
 ### Community 106 - "Output Format"
 Cohesion: 0.50
 Nodes (4): 1. Content Pillars, 2. Priority Topics, 3. Topic Cluster Map, Output Format
 
-### Community 107 - "Content Types"
-Cohesion: 0.50
-Nodes (4): Content Types, Link-Earning Formats, Searchable Content Types, Shareable Content Types
+### Community 107 - "api/newsletter/route.ts"
+Cohesion: 0.36
+Nodes (4): dynamic, POST(), NewsletterRequestError, parseNewsletterSignup()
 
 ### Community 109 - "Prefer Statically Analyzable Paths"
 Cohesion: 0.50
 Nodes (3): File-System Paths, Import Paths, Prefer Statically Analyzable Paths
 
-### Community 181 - "reports/page.tsx"
-Cohesion: 0.28
-Nodes (8): AdminReportsPage(), LABEL, MONTHS, pct(), priceRangeLabel(), ReportData, SERIES_COLORS, STATUS_LABEL
+### Community 181 - "settings/page.tsx"
+Cohesion: 0.36
+Nodes (7): AdminSettingsPage(), Form, IconInput(), pickForm(), SOCIAL, Tab, SaveBar()
 
-### Community 182 - ".generate"
-Cohesion: 0.16
-Nodes (8): _filter_anti_patterns_for_mode(), Drop "avoid dark mode" advice once dark mode is the resolved answer., Execute searches across multiple domains., Extract results list from search result dict., Generate complete design system recommendation. variance/motion/density are…, Bucket a 1-10 dial value into its tier config. Returns None if value is None., _resolve_dial(), TestAntiPatternGating
+### Community 182 - "CarsContent"
+Cohesion: 0.28
+Nodes (9): CarsContent(), CarsPage(), CategoryChip(), DebouncedInput(), Filters(), ResultsGrid(), ResultsSkeleton(), Segmented() (+1 more)
 
 ### Community 183 - "image-processing.ts"
-Cohesion: 0.16
-Nodes (16): ref_node_path, sharp, dynamic, POST(), runtime, SAMPLES, listingWatermark(), IMAGE_TARGETS (+8 more)
-
-### Community 184 - "api/newsletter/route.ts"
-Cohesion: 0.36
-Nodes (4): dynamic, POST(), NewsletterRequestError, parseNewsletterSignup()
-
-### Community 185 - "seo-score.ts"
 Cohesion: 0.32
-Nodes (7): between(), CheckStatus, mentions(), ScoreInput, scorePage(), SeoCheck, VALUE
+Nodes (7): IMAGE_TARGETS, ImageJob, ImageProcessorUnavailable, loadSharp(), optimiseImage(), SharpFactory, WatermarkSpec
 
-### Community 186 - "AdminShell.tsx"
-Cohesion: 0.18
-Nodes (16): AdminLayout(), metadata, AdminProvider(), AdminShell(), AlertsMenu(), ALL_ITEMS, CommandPalette(), Counts (+8 more)
+### Community 184 - "ui.tsx"
+Cohesion: 0.08
+Nodes (44): AdminActivityPage(), AREA_ICON, AREA_TONE, Entry, fullDate(), PERIODS, Response, AdminInboxPage() (+36 more)
 
-### Community 187 - "contact-request.ts"
-Cohesion: 0.16
-Nodes (11): Message, POST(), CONTACT_TOPICS, ContactInput, ContactRequestError, ContactTopic, parseContactRequest(), text() (+3 more)
+### Community 185 - "contact-request.ts"
+Cohesion: 0.20
+Nodes (12): Message, dynamic, POST(), CONTACT_TOPICS, ContactInput, ContactRequestError, ContactTopic, parseContactRequest() (+4 more)
 
-### Community 188 - "SiteSettingsContext.tsx"
-Cohesion: 0.18
-Nodes (13): DEFAULT_SETTINGS, mergeSettings(), SiteSettingsContext, SiteSettingsContextType, SiteSettingsProvider(), SiteSettingsState, SocialLinks, ISiteSettings (+5 more)
-
-### Community 189 - "next-auth"
-Cohesion: 0.12
-Nodes (20): next-auth, POST(), dynamic, GET(), SOURCE, Totals, handler, dynamic (+12 more)
-
-### Community 191 - "listing-input.ts"
-Cohesion: 0.25
-Nodes (10): POST(), CONDITIONS, FUEL_TYPES, ListingInput, number(), oneOf(), parseListingInput(), strings() (+2 more)
-
-### Community 192 - "Reveal"
-Cohesion: 0.27
-Nodes (9): AppleLogo(), AppPromo(), PERKS, PlayLogo(), optimisable(), POINTS, SellBanner(), Float() (+1 more)
-
-### Community 193 - "ref_node_assert"
-Cohesion: 0.24
-Nodes (7): ref_node_assert, ref_node_module, ref_node_test, valid, good, sharp, spec
-
-### Community 194 - "CatalogSummaryLineEndingsTest"
-Cohesion: 0.40
-Nodes (3): CatalogSummaryLineEndingsTest, _load_generator(), Simulate a Windows checkout: the recorded hashes must still validate.
-
-### Community 195 - "split_values"
+### Community 186 - "Footer.tsx"
 Cohesion: 0.47
-Nodes (3): split_values(), style_identities(), TestStyleIdentityContract
+Nodes (8): Footer(), NewsletterForm(), SiteFooter(), FacebookIcon(), InstagramIcon(), LinkedinIcon(), TwitterIcon(), YoutubeIcon()
 
-### Community 198 - "system/page.tsx"
+### Community 187 - "listing-input.ts"
+Cohesion: 0.27
+Nodes (10): FUEL_TYPES, parseFuelTypes(), CONDITIONS, ListingInput, number(), oneOf(), parseListingInput(), strings() (+2 more)
+
+### Community 188 - "site-settings.ts"
+Cohesion: 0.24
+Nodes (11): dynamic, GET(), ISiteSettings, ITestimonial, SiteSettings, SiteSettingsSchema, AppearanceSettings, DEFAULT_APPEARANCE (+3 more)
+
+### Community 189 - "isStaffRole"
+Cohesion: 0.17
+Nodes (13): POST(), dynamic, GET(), SOURCE, Totals, AnalyticsRequestError, analyticsScope(), parseAnalyticsRequest() (+5 more)
+
+### Community 191 - "dashboard/page.tsx"
+Cohesion: 0.11
+Nodes (27): ChatMessage, Conversation, MessagesContent(), MessagesPage(), QUICK_REPLIES_BUYER, QUICK_REPLIES_SELLER, DashboardSummary, MyListing (+19 more)
+
+### Community 192 - "Reviews.tsx"
+Cohesion: 0.39
+Nodes (6): TESTIMONIALS, loadReviews(), Reviews(), AVATAR_TINTS, ReviewItem, ReviewsCarousel()
+
+### Community 193 - "buildListingQuery"
+Cohesion: 0.43
+Nodes (6): fuelMatch(), BODY_MODELS, buildListingQuery(), literal(), price(), query()
+
+### Community 194 - "SiteSettingsContext.tsx"
+Cohesion: 0.20
+Nodes (12): identity(), TrafficTracker(), Providers(), MarketplaceProvider(), DEFAULT_SETTINGS, mergeSettings(), SiteSettingsContext, SiteSettingsContextType (+4 more)
+
+### Community 195 - "Content Pillars and Topic Clusters"
 Cohesion: 0.50
-Nodes (4): AdminSystemPage(), Check(), COUNT_LABEL, SystemData
+Nodes (4): Content Pillars and Topic Clusters, How to Identify Pillars, Pillar Criteria, Pillar Structure
 
 ## Ambiguous Edges - Review These
 - `Local Uploads Directory Media (served via /uploads/[filename])` → `Uploaded Image 1782323677351 (GWR train at station platform; not a car)`  [AMBIGUOUS]
@@ -737,9 +733,9 @@ Nodes (4): AdminSystemPage(), Check(), COUNT_LABEL, SystemData
   public/uploads/1782323677829-d5y9y0.webp · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **868 isolated node(s):** `$schema`, `style`, `rsc`, `tsx`, `config` (+863 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1106 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **81 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **884 isolated node(s):** `$schema`, `style`, `rsc`, `tsx`, `config` (+879 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1122 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **77 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -748,13 +744,13 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Local Uploads Directory Media (served via /uploads/[filename])` and `Uploaded Image 1782323677829 (US one-dollar bill on wood; not a car)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `next` connect `next` to `about/page.tsx`, `roles/page.tsx`, `upload/route.ts`, `cn`, `app/page.tsx`, `[brand]/page.tsx`, `site-config.ts`, `users/route.ts`, `stats/route.ts`, `system/route.ts`, `db.ts`, `data.ts`, `appearance/page.tsx`, `ui/page.tsx`, `signup.ts`, `cars/[slug]/page.tsx`, `connectToDatabase`, `[filename]/route.ts`, `buildMetadata`, `seo/page.tsx`, `package.json`, `seo.ts`, `utils.ts`, `profile/page.tsx`, `favorites/route.ts`, `admin/page.tsx`, `Button`, `users/page.tsx`, `reports/page.tsx`, `image-processing.ts`, `api/newsletter/route.ts`, `app/layout.tsx`, `AdminShell.tsx`, `sell/page.tsx`, `next-auth`, `Reveal`, `system/page.tsx`, `Showcases.tsx`, `AiAssistant.tsx`, `dashboard/page.tsx`?**
-  _High betweenness centrality (0.092) - this node is a cross-community bridge._
-- **Why does `cn()` connect `cn` to `about/page.tsx`, `roles/page.tsx`, `app/page.tsx`, `[brand]/page.tsx`, `db.ts`, `data.ts`, `appearance/page.tsx`, `ui/page.tsx`, `cars/[slug]/page.tsx`, `buildMetadata`, `seo/page.tsx`, `utils.ts`, `profile/page.tsx`, `admin/page.tsx`, `Button`, `users/page.tsx`, `sell/page.tsx`, `app/layout.tsx`, `AdminShell.tsx`, `system/page.tsx`, `Showcases.tsx`, `dashboard/page.tsx`?**
-  _High betweenness centrality (0.084) - this node is a cross-community bridge._
-- **Why does `Avatar()` connect `users/page.tsx` to `5. Re-render Optimization`, `cn`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `next` connect `next` to `app/page.tsx`, `AdminShell.tsx`, `upload/route.ts`, `TrafficDashboard.tsx`, `Listing.ts`, `seo.ts`, `permissions.ts`, `admin/listings/route.ts`, `[filename]/route.ts`, `formatLakh`, `cars/page.tsx`, `cn`, `cars/[slug]/page.tsx`, `lucide-react`, `contact-details.ts`, `connectToDatabase`, `sell/page.tsx`, `favorites/route.ts`, `package.json`, `utils.ts`, `react`, `next-auth`, `db.ts`, `watermark.ts`, `admin/page.tsx`, `listings/page.tsx`, `index.ts`, `settings/page.tsx`, `ui.tsx`, `seo/page.tsx`, `contact-request.ts`, `app/layout.tsx`, `site-settings.ts`, `isStaffRole`, `Footer.tsx`, `dashboard/page.tsx`, `admin/settings/route.ts`, `Reviews.tsx`, `SiteSettingsContext.tsx`, `Navbar.tsx`, `MarketplacePanels.tsx`, `api/newsletter/route.ts`?**
+  _High betweenness centrality (0.100) - this node is a cross-community bridge._
+- **Why does `cn()` connect `cn` to `app/page.tsx`, `AdminShell.tsx`, `TrafficDashboard.tsx`, `seo.ts`, `formatLakh`, `cars/page.tsx`, `cars/[slug]/page.tsx`, `lucide-react`, `seo-text.ts`, `sell/page.tsx`, `next`, `utils.ts`, `react`, `admin/page.tsx`, `listings/page.tsx`, `settings/page.tsx`, `CarsContent`, `ui.tsx`, `seo/page.tsx`, `app/layout.tsx`, `Footer.tsx`, `dashboard/page.tsx`, `Reviews.tsx`, `Navbar.tsx`, `MarketplacePanels.tsx`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+- **Why does `Avatar()` connect `listings/page.tsx` to `5. Re-render Optimization`, `cn`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **What connects `$schema`, `style`, `rsc` to the rest of the system?**
-  _868 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `about/page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.13445378151260504 - nodes in this community are weakly interconnected._
+  _884 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `app/page.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.09643483343074226 - nodes in this community are weakly interconnected._

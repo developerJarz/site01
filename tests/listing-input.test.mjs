@@ -38,3 +38,10 @@ test("bad numbers and unknown options are rejected or defaulted", () => {
   assert.equal(parseListingInput({ ...valid, description: "ok" }).ok, false);
   assert.equal(parseListingInput({ ...valid, fuelType: { $ne: null } }).value.fuelType, "petrol");
 });
+
+test("a car can run on several fuels; the first is kept as the primary fuel", () => {
+  const result = parseListingInput({ ...valid, fuelTypes: ["octane", "cng", "octane", "rocket"] });
+  assert.deepEqual(result.value.fuelTypes, ["octane", "cng"]);
+  assert.equal(result.value.fuelType, "octane");
+  assert.deepEqual(parseListingInput(valid).value.fuelTypes, ["hybrid"]);
+});

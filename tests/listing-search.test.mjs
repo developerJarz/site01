@@ -12,7 +12,7 @@ test("a homepage search combines model and numeric year with the existing filter
   assert.doesNotMatch("Toyota Extra", result.make);
   assert.match("Corolla Cross", result.model);
   assert.doesNotMatch("Corolla", result.model);
-  assert.equal(result.fuelType, "hybrid");
+  assert.deepEqual(result.$and, [{ $or: [{ fuelTypes: { $in: ["hybrid"] } }, { fuelType: { $in: ["hybrid"] } }] }]);
   assert.equal(result.paperVerified, true);
   assert.match("Gulshan, Dhaka", result.location);
   assert.deepEqual(result.price, { $gte: 2000000, $lte: 4000000 });
@@ -29,8 +29,12 @@ test("category browsing does not replace the shopper's text search", () => {
 });
 
 test("hybrid and electric categories use the real fuel field", () => {
-  assert.equal(query("category=hybrid").fuelType, "hybrid");
-  assert.equal(query("category=electric").fuelType, "electric");
+  assert.deepEqual(query("category=hybrid").$and, [{ $or: [{ fuelTypes: { $in: ["hybrid"] } }, { fuelType: { $in: ["hybrid"] } }] }]);
+  assert.deepEqual(query("category=electric").$and, [{ $or: [{ fuelTypes: { $in: ["electric"] } }, { fuelType: { $in: ["electric"] } }] }]);
+});
+
+test("several fuels match cars running on any of them, old single-fuel listings included", () => {
+  assert.deepEqual(query("fuelType=octane,cng").$and, [{ $or: [{ fuelTypes: { $in: ["octane", "cng"] } }, { fuelType: { $in: ["octane", "cng"] } }] }]);
 });
 
 test("search treats regular expression characters as literal user input", () => {

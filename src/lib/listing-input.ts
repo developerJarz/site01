@@ -3,8 +3,10 @@
  * a request can't set `featured`, `views`, `status` or `paperVerified` for itself.
  */
 
+import { FUEL_TYPES, parseFuelTypes } from "./fuel.ts";
+
+export { FUEL_TYPES };
 export const CONDITIONS = ["new", "used", "reconditioned"] as const;
-export const FUEL_TYPES = ["petrol", "diesel", "cng", "hybrid", "electric", "octane"] as const;
 export const TRANSMISSIONS = ["manual", "automatic", "semi-automatic"] as const;
 
 export type ListingInput = {
@@ -15,6 +17,7 @@ export type ListingInput = {
   mileage: number;
   condition: (typeof CONDITIONS)[number];
   fuelType: (typeof FUEL_TYPES)[number];
+  fuelTypes: (typeof FUEL_TYPES)[number][];
   transmission: (typeof TRANSMISSIONS)[number];
   engineSize: number;
   color: string;
@@ -62,6 +65,8 @@ export function parseListingInput(
   const images = strings(body.images, maxImages, 8_000_000).filter(isMedia);
   if (images.length === 0) return { ok: false, error: "Add at least one photo of the car." };
 
+  const fuelTypes = parseFuelTypes(body);
+
   return {
     ok: true,
     value: {
@@ -71,7 +76,8 @@ export function parseListingInput(
       price: Math.round(price),
       mileage: Math.round(mileage),
       condition: oneOf(CONDITIONS, body.condition, "used"),
-      fuelType: oneOf(FUEL_TYPES, body.fuelType, "petrol"),
+      fuelType: fuelTypes[0],
+      fuelTypes,
       transmission: oneOf(TRANSMISSIONS, body.transmission, "automatic"),
       engineSize,
       color: text(body.color, 40) || "Not specified",

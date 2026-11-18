@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logActivity, plural } from "@/lib/activity";
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -105,6 +106,7 @@ export async function PUT(req: Request) {
     invalidateSeoCache();
     revalidatePath(path);
     revalidatePath("/sitemap.xml");
+    await logActivity(auth.session, { action: "seo.page", summary: empty ? `Reset SEO for ${path}` : `Edited SEO for ${path}`, targetId: path, targetLabel: path }, req);
     return NextResponse.json({ success: true, override: empty ? null : { path, ...update } });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
@@ -137,6 +139,7 @@ export async function PATCH(req: Request) {
       }, { upsert: true, setDefaultsOnInsert: true });
       invalidateSeoCache();
       revalidatePath("/", "layout");
+      await logActivity(auth.session, { action: "seo.globals", summary: "Changed site-wide SEO defaults" }, req);
       return NextResponse.json({ success: true });
     }
 
@@ -154,6 +157,7 @@ export async function PATCH(req: Request) {
       }
       await SiteSettings.findOneAndUpdate({}, { $set: { testimonials } }, { upsert: true, setDefaultsOnInsert: true });
       revalidatePath("/");
+      await logActivity(auth.session, { action: "seo.reviews", summary: `Updated homepage reviews (${plural(testimonials.length, "review")})` }, req);
       return NextResponse.json({ success: true });
     }
 

@@ -8,6 +8,7 @@ import { CarImage } from "@/components/CarImage";
 import { Badge } from "@/components/ui/badge";
 import { useMarketplace } from "@/context/MarketplaceContext";
 import { cn, formatKm, formatTaka, priceParts } from "@/lib/utils";
+import { fuelLabel } from "@/lib/fuel";
 
 export interface CarCardData {
   _id: string;
@@ -19,6 +20,7 @@ export interface CarCardData {
   year?: number;
   mileage?: number;
   fuelType?: string;
+  fuelTypes?: string[];
   transmission?: string;
   condition?: string;
   location?: string;
@@ -75,7 +77,7 @@ export function CarCard({ car, priority, sizes }: { car: CarCardData; priority?:
 
   const specs = [
     { icon: Gauge, label: "Mileage", value: car.mileage !== undefined ? formatKm(car.mileage) : "—" },
-    { icon: Fuel, label: "Fuel", value: car.fuelType ? FUEL_LABEL[car.fuelType] || car.fuelType : "—" },
+    { icon: Fuel, label: "Fuel", value: fuelLabel(car, FUEL_LABEL) || "—" },
     { icon: Settings2, label: "Transmission", value: car.transmission ? GEAR_LABEL[car.transmission] || car.transmission : "—" },
   ];
 

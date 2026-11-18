@@ -36,6 +36,26 @@ export function dialableNumber(value: unknown) {
   return phone ? phone.slice(1) : typeof value === "string" ? value.replace(/\D/g, "") : "";
 }
 
+/**
+ * Per-car numbers staff can set on a listing. Empty strings clear them, so the car falls back to
+ * the seller account's numbers. Returns only the fields that were sent.
+ */
+export function parseListingContact(input: { contactPhone?: unknown; contactWhatsApp?: unknown }):
+  { ok: true; value: { contactPhone?: string; contactWhatsApp?: string } } | { ok: false; error: string } {
+  const value: { contactPhone?: string; contactWhatsApp?: string } = {};
+  if (input.contactPhone !== undefined) {
+    const phone = normalisePhoneNumber(input.contactPhone);
+    if (phone === null) return { ok: false, error: "Enter a valid Bangladesh mobile number for this car, e.g. 01712 345678." };
+    value.contactPhone = phone;
+  }
+  if (input.contactWhatsApp !== undefined) {
+    const whatsapp = normalisePhoneNumber(input.contactWhatsApp);
+    if (whatsapp === null) return { ok: false, error: "Enter a valid WhatsApp number for this car." };
+    value.contactWhatsApp = whatsapp;
+  }
+  return { ok: true, value };
+}
+
 export function parseContactDetails(input: ContactInput, required = true): { ok: true; value: ContactDetails } | { ok: false; error: string } {
   const phone = normalisePhoneNumber(input.phone);
   if (phone === null || (required && !phone)) return { ok: false, error: "Enter a valid Bangladesh mobile number, e.g. 01712 345678." };

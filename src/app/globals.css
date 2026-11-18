@@ -687,3 +687,11 @@
   background: rgb(71 85 105 / 0.5);
   background-clip: content-box;
 }
+
+/* Netlify injects a "Powered by Netlify" badge (and its pop-up card) into every page; hide both. */
+#nl-badge,
+#nl-card,
+.nl-badge,
+.nl-card {
+  display: none !important;
+}

@@ -58,6 +58,7 @@ export async function GET(req: Request) {
         year: car.year,
         mileage: car.mileage,
         fuelType: car.fuelType,
+        fuelTypes: car.fuelTypes,
         transmission: car.transmission,
         location: car.location,
         status: car.status,

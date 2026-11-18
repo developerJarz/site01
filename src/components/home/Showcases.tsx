@@ -12,6 +12,7 @@ import { Reveal } from "@/components/ui/motion";
 import { cn, formatKm, formatLakh } from "@/lib/utils";
 import { SectionHeading } from "./SectionHeading";
 import { listingImageAlt } from "@/lib/seo-text";
+import { fuelLabel } from "@/lib/fuel";
 
 import type { HomeSectionConfig } from "@/lib/site-config";
 
@@ -19,7 +20,7 @@ export type ShowcaseCar = CarCardData & { createdAt?: string; discount?: number;
 
 const carName = (car: ShowcaseCar) => (car.make && car.model ? `${car.make} ${car.model}` : car.title);
 const specLine = (car: ShowcaseCar) =>
-  [car.year, car.mileage !== undefined ? formatKm(car.mileage) : null, car.fuelType ? FUEL_LABEL[car.fuelType] || car.fuelType : null].filter(Boolean).join(" · ");
+  [car.year, car.mileage !== undefined ? formatKm(car.mileage) : null, fuelLabel(car, FUEL_LABEL) || null].filter(Boolean).join(" · ");
 
 /** Vertical card used by the tabbed and rail showcases. `data-listing-id` feeds impression and click tracking. */
 function Tile({ car, sizes, badge }: { car: ShowcaseCar; sizes: string; badge?: React.ReactNode }) {
@@ -191,7 +192,7 @@ export function BudgetPicks({ cars, max, config }: { cars: ShowcaseCar[]; max: n
                 <span className="block truncate font-bold text-night group-hover:text-electric">{carName(car)}</span>
                 <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-text tabular">
                   {car.mileage !== undefined && <span className="inline-flex items-center gap-1"><Gauge size={12} aria-hidden /> {formatKm(car.mileage)}</span>}
-                  {car.fuelType && <span className="inline-flex items-center gap-1"><Fuel size={12} aria-hidden /> {FUEL_LABEL[car.fuelType] || car.fuelType}</span>}
+                  {fuelLabel(car, FUEL_LABEL) && <span className="inline-flex items-center gap-1"><Fuel size={12} aria-hidden /> {fuelLabel(car, FUEL_LABEL)}</span>}
                   {car.year && <span>{car.year}</span>}
                 </span>
                 <span className="mt-2 flex items-center justify-between gap-2">

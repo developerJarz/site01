@@ -116,7 +116,11 @@ function CarsContent() {
     if (get("model")) chips.push({ key: "model", label: get("model"), clear: { model: "" } });
     if (get("year")) chips.push({ key: "year", label: get("year"), clear: { year: "" } });
     if (get("condition")) chips.push({ key: "condition", label: CONDITIONS.find((c) => c.value === get("condition"))?.label || get("condition"), clear: { condition: "" } });
-    if (get("fuelType")) chips.push({ key: "fuelType", label: FUELS.find((f) => f.value === get("fuelType"))?.label || get("fuelType"), clear: { fuelType: "" } });
+    // Several fuels can be picked at once (?fuelType=octane,cng); each gets its own chip.
+    const fuels = get("fuelType").split(",").filter(Boolean);
+    for (const fuel of fuels) {
+      chips.push({ key: `fuel-${fuel}`, label: FUELS.find((f) => f.value === fuel)?.label || fuel, clear: { fuelType: fuels.filter((f) => f !== fuel).join(",") } });
+    }
     if (get("transmission")) chips.push({ key: "transmission", label: TRANSMISSIONS.find((t) => t.value === get("transmission"))?.label || get("transmission"), clear: { transmission: "" } });
     if (get("minPrice") || get("maxPrice")) {
       const min = get("minPrice"), max = get("maxPrice");
@@ -393,9 +397,11 @@ function Filters({ get, setParams }: { get: (k: string) => string; setParams: (u
         <legend className="field-label">Fuel</legend>
         <div className="grid grid-cols-3 gap-1.5">
           {FUELS.map((f) => {
-            const on = get("fuelType") === f.value;
+            const picked = get("fuelType").split(",").filter(Boolean);
+            const on = picked.includes(f.value);
+            const next = on ? picked.filter((v) => v !== f.value) : [...picked, f.value];
             return (
-              <button key={f.value} type="button" aria-pressed={on} onClick={() => setParams({ fuelType: on ? "" : f.value })}
+              <button key={f.value} type="button" aria-pressed={on} onClick={() => setParams({ fuelType: next.join(",") })}
                 className={cn("h-10 rounded-xl border text-[13px] font-semibold transition-colors",
                   on ? "border-electric bg-electric text-white" : "border-hairline text-slate-text hover:border-electric/40 hover:text-night")}>
                 {f.label}

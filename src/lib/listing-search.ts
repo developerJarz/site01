@@ -1,3 +1,5 @@
+import { fuelMatch } from "./fuel.ts";
+
 const BODY_MODELS: Record<string, RegExp> = {
   suv: /^(?:Harrier|Corolla Cross|RAV4|Land Cruiser|Prado|Vezel|CR-V|HR-V|CX[- ]?[3589]|X-Trail|Qashqai|Juke|Pajero|Outlander|Tucson|Santa Fe|Sportage|Sorento|Tiguan|Touareg|X[1-7]|RX|NX|UX|Q[2-8]|GL[ABCEKS])\b/i,
   sedan: /^(?:Axio|Corolla(?! Cross)|Premio|Allion|Camry|Civic|Accord|Insight|Grace|City|Sylphy|Teana|Lancer|Elantra|Sonata|[357] Series|[CES]-Class|A[468]|IS|ES|LS)\b/i,
@@ -33,10 +35,13 @@ export function buildListingQuery(params: URLSearchParams): Record<string, unkno
   }
   const location = params.get("location")?.trim().slice(0, 100);
   if (location) query.location = literal(location);
-  for (const field of ["condition", "fuelType", "transmission"] as const) {
+  for (const field of ["condition", "transmission"] as const) {
     const value = params.get(field)?.trim();
     if (value) query[field] = value;
   }
+  // ?fuelType=octane,cng matches cars that run on any of them, including multi-fuel cars.
+  const fuels = (params.get("fuelType") || "").split(",").map((f) => f.trim()).filter(Boolean).slice(0, 6);
+  if (fuels.length) clauses.push(fuelMatch(fuels));
   if (params.get("verified") === "1") query.paperVerified = true;
   // One seller's or dealer's stock; only a well-formed ObjectId reaches the query.
   const seller = params.get("seller")?.trim();
@@ -62,9 +67,8 @@ export function buildListingQuery(params: URLSearchParams): Record<string, unkno
   }
   const category = params.get("category")?.toLowerCase();
   if (category === "hybrid" || category === "electric") {
-    // Keep an explicitly selected fuel constraint when it conflicts with a category.
-    if (query.fuelType && query.fuelType !== category) clauses.push({ fuelType: category });
-    else query.fuelType = category;
+    // Added alongside any explicitly selected fuels, so both constraints apply.
+    clauses.push(fuelMatch([category]));
   } else if (category === "luxury") {
     clauses.push({ make: /^(?:BMW|Mercedes(?:-Benz)?|Audi|Lexus|Porsche|Bentley|Land Rover|Jaguar|Rolls-Royce)$/i });
   } else if (category && BODY_MODELS[category]) {

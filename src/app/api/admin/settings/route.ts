@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logActivity } from "@/lib/activity";
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db";
 import { SiteSettings } from "@/lib/models/SiteSettings";
@@ -112,6 +113,13 @@ export async function PATCH(req: Request) {
     invalidateSeoCache();
     // Header, footer, favicon and colours are in the root layout; the homepage is cached for a minute.
     revalidatePath("/", "layout");
+    const fields = Object.keys(update);
+    const appearance = fields.some((f) => f.startsWith("appearance"));
+    await logActivity(auth.session, {
+      action: appearance ? "settings.appearance" : "settings.update",
+      summary: appearance ? "Changed the website appearance" : `Changed site settings (${fields.slice(0, 4).join(", ")}${fields.length > 4 ? "…" : ""})`,
+      details: { fields },
+    }, req);
 
     return NextResponse.json({
       success: true,

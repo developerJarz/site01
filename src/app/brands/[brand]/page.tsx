@@ -19,7 +19,7 @@ export const revalidate = 600;
 type Props = { params: Promise<{ brand: string }> };
 
 const CARD_FIELDS = {
-  title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1, transmission: 1, color: 1,
+  title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1, fuelTypes: 1, transmission: 1, color: 1,
   condition: 1, location: 1, featured: 1, paperVerified: 1, status: 1, sellerId: 1, images: { $slice: 1 }, imageAlts: { $slice: 1 },
 };
 

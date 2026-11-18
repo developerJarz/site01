@@ -7,6 +7,8 @@ import { SiteSettings } from "@/lib/models/SiteSettings";
 import { User } from "@/lib/models/User";
 import { parseListingInput } from "@/lib/listing-input";
 import { isStaffRole } from "@/lib/permissions";
+import { parseListingContact } from "@/lib/contact-details";
+import { logActivity } from "@/lib/activity";
 import { escapeRegex } from "@/lib/utils";
 
 export async function POST(req: Request) {
@@ -28,6 +30,13 @@ export async function POST(req: Request) {
     const input = parsed.value;
     const userId = (session.user as { id?: string }).id;
     const isAdmin = isStaffRole((session.user as { role?: string }).role);
+    // Staff posting for different owners can give each car its own phone/WhatsApp numbers.
+    let contact: { contactPhone?: string; contactWhatsApp?: string } = {};
+    if (isAdmin) {
+      const parsedContact = parseListingContact(body);
+      if (!parsedContact.ok) return NextResponse.json({ error: parsedContact.error }, { status: 400 });
+      contact = Object.fromEntries(Object.entries(parsedContact.value).filter(([, v]) => v));
+    }
     // Live straight away when the site default says so, or for verified sellers when auto-approve is on.
     const verifiedSeller = settings?.autoApproveListings ? !!(await User.exists({ _id: userId, isVerified: true })) : false;
     const status = isAdmin || settings?.defaultListingStatus === "active" || verifiedSeller ? "active" : "pending";
@@ -36,6 +45,7 @@ export async function POST(req: Request) {
 
     const listing = await Listing.create({
       ...input,
+      ...contact,
       title,
       slug,
       sellerId: userId,
@@ -45,6 +55,9 @@ export async function POST(req: Request) {
       views: 0,
     });
 
+    if (isAdmin) {
+      await logActivity(session, { action: "listing.create", summary: `Posted listing “${title}”`, targetId: String(listing._id), targetLabel: title }, req);
+    }
     return NextResponse.json({ success: true, status, listing: { _id: listing._id, slug: listing.slug, status } }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

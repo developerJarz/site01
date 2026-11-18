@@ -28,6 +28,7 @@ const WIDGETS = [
   { key: "queue", label: "Review queue & status", description: "Approve listings without leaving the page" },
   { key: "market", label: "Market", description: "Stock by make, city and price" },
   { key: "people", label: "People", description: "Top sellers, most viewed, newest accounts" },
+  { key: "team-activity", label: "Team activity", description: "The latest changes made by the team" },
 ] as const;
 type WidgetKey = (typeof WIDGETS)[number]["key"];
 
@@ -368,6 +369,7 @@ export default function AdminDashboard() {
           </Panel>
         </div>
     ),
+    "team-activity": <TeamActivity />,
   };
   const layout = resolveLayout(me?.prefs.dashboard);
 
@@ -427,6 +429,41 @@ const SHORTCUTS: { href: string; label: string; hint: string; icon: typeof Car; 
 ];
 
 /** One-click links to the tools this person's role can use. */
+type ActivityEntry = { _id: string; summary: string; actorName?: string; actorEmail?: string; actorRole?: string; area: string; createdAt: string };
+
+/** Latest admin changes. People without the full log see only their own actions. */
+function TeamActivity() {
+  const { can } = useAdmin();
+  const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    api<{ entries: ActivityEntry[] }>("/api/admin/activity?recent=1").then((d) => setEntries(d.entries)).catch(() => setFailed(true));
+  }, []);
+  const full = can("activity.view");
+  return (
+    <Panel title={full ? "Team activity" : "Your recent activity"} subtitle="Latest changes in the admin area" flush
+      action={full ? <Link href="/admin/activity" className="text-sm font-semibold text-electric hover:underline">Full log</Link> : undefined}>
+      {failed ? <p className="px-6 pb-6 text-sm text-slate-text">Couldn&apos;t load the activity log.</p>
+        : !entries ? <div className="space-y-2 px-6 pb-6">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-10 rounded-xl" />)}</div>
+        : entries.length === 0 ? <p className="px-6 pb-6 text-sm text-slate-text">No changes recorded yet.</p> : (
+          <ul className="divide-y divide-hairline">
+            {entries.map((e) => (
+              <li key={e._id} className="flex items-start gap-3 px-5 py-3 md:px-6">
+                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-haze text-[13px] font-bold text-electric-deep" aria-hidden>
+                  {(e.actorName || e.actorEmail || "?")[0]?.toUpperCase()}
+                </span>
+                <div className="min-w-0 grow">
+                  <p className="text-sm font-semibold text-night [overflow-wrap:anywhere]">{e.summary}</p>
+                  <p className="text-[13px] text-slate-text">{e.actorName || e.actorEmail || "Unknown"}{e.actorRole ? ` (${e.actorRole})` : ""} · {timeAgo(e.createdAt)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+    </Panel>
+  );
+}
+
 function Shortcuts() {
   const { can } = useAdmin();
   const items = SHORTCUTS.filter((s) => can(...s.anyOf));

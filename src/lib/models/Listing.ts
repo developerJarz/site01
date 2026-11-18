@@ -11,11 +11,17 @@ export interface IListing {
   model: string;
   year: number;
   mileage: number;
+  /** Primary fuel, always fuelTypes[0] on newer listings. */
   fuelType: "petrol" | "diesel" | "cng" | "hybrid" | "electric" | "octane";
+  /** Every fuel the car runs on, e.g. ["octane", "cng"]. Older listings may not have it. */
+  fuelTypes?: string[];
   transmission: "manual" | "automatic" | "semi-automatic";
   engineSize: number;
   color: string;
   location: string;
+  /** Per-car contact numbers set by staff; when present they replace the seller account's numbers. */
+  contactPhone?: string;
+  contactWhatsApp?: string;
   sellerId: mongoose.Types.ObjectId;
   images: string[];
   documents: string[];
@@ -52,6 +58,7 @@ const ListingSchema: Schema<IListing> = new Schema(
       enum: ["petrol", "diesel", "cng", "hybrid", "electric", "octane"],
       required: true,
     },
+    fuelTypes: [{ type: String, enum: ["petrol", "diesel", "cng", "hybrid", "electric", "octane"] }],
     transmission: {
       type: String,
       enum: ["manual", "automatic", "semi-automatic"],
@@ -60,6 +67,8 @@ const ListingSchema: Schema<IListing> = new Schema(
     engineSize: { type: Number, required: true },
     color: { type: String, required: true },
     location: { type: String, required: true },
+    contactPhone: { type: String, trim: true },
+    contactWhatsApp: { type: String, trim: true },
     sellerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     images: [{ type: String }],
     documents: [{ type: String }],

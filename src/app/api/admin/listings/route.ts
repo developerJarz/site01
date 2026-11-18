@@ -6,6 +6,19 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { deleteListingsCascade } from "@/lib/cleanup";
 import { escapeRegex, listingImageUrl } from "@/lib/utils";
 import { signDocumentUrl } from "@/lib/cloudinary";
+import { parseFuelTypes } from "@/lib/fuel";
+import { parseListingContact } from "@/lib/contact-details";
+import { changedFields, logActivity, plural } from "@/lib/activity";
+
+/** Plain-English description of a listing change for the activity log. */
+function describeListingChange(update: Record<string, unknown>) {
+  if (typeof update.status === "string") return `set to ${update.status}`;
+  if (update.featured === true) return "featured";
+  if (update.featured === false) return "un-featured";
+  if (update.paperVerified === true) return "Paper Verified";
+  if (update.paperVerified === false) return "Paper Verified removed from";
+  return "edited";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +104,7 @@ export async function GET(req: NextRequest) {
           // storage these are base64 strings and can run to megabytes per listing.
           $project: {
             title: 1, slug: 1, description: 1, price: 1, condition: 1, make: 1, model: 1,
-            year: 1, mileage: 1, fuelType: 1, transmission: 1, engineSize: 1, color: 1,
+            year: 1, mileage: 1, fuelType: 1, fuelTypes: 1, contactPhone: 1, contactWhatsApp: 1, transmission: 1, engineSize: 1, color: 1,
             location: 1, views: 1, status: 1, featured: 1, paperVerified: 1,
             paperVerifiedAt: 1, paperVerificationNote: 1, features: 1, createdAt: 1, seoTitle: 1, seoDescription: 1,
             thumb: { $arrayElemAt: ["$images", 0] },
@@ -169,6 +182,13 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "Unknown status" }, { status: 400 });
       }
       const result = await Listing.updateMany({ _id: { $in: ids } }, { $set: update });
+      const what = describeListingChange(update);
+      await logActivity(auth.session, {
+        action: "listing.bulk_update",
+        summary: what === "edited" ? `Edited ${plural(ids.length, "listing")}` : `${plural(ids.length, "listing")} ${what}`.replace(/^./, (c) => c.toUpperCase()),
+        targetId: ids.join(","),
+        details: { fields: Object.keys(update), status: update.status, modified: result.modifiedCount },
+      }, req);
       return NextResponse.json({ success: true, modified: result.modifiedCount });
     }
 
@@ -183,6 +203,15 @@ export async function PATCH(req: NextRequest) {
     }
     if (update.seoTitle !== undefined) update.seoTitle = String(update.seoTitle ?? "").trim().slice(0, 120);
     if (update.seoDescription !== undefined) update.seoDescription = String(update.seoDescription ?? "").trim().slice(0, 320);
+    // Several fuels per car; fuelType mirrors the first so filters and reports keep working.
+    if (body.fuelTypes !== undefined || body.fuelType !== undefined) {
+      const fuelTypes = parseFuelTypes(body);
+      update.fuelTypes = fuelTypes;
+      update.fuelType = fuelTypes[0];
+    }
+    const contact = parseListingContact(body);
+    if (!contact.ok) return NextResponse.json({ error: contact.error }, { status: 400 });
+    Object.assign(update, contact.value);
     if (update.imageAlts !== undefined) {
       update.imageAlts = Array.isArray(update.imageAlts) ? update.imageAlts.slice(0, 50).map((a: unknown) => String(a ?? "").trim().slice(0, 200)) : [];
     }
@@ -207,6 +236,16 @@ export async function PATCH(req: NextRequest) {
       { new: true, strict: false, projection: { images: 0, documents: 0 } }
     ).lean();
 
+    if (updated) {
+      const what = describeListingChange(update);
+      await logActivity(auth.session, {
+        action: what === "edited" ? "listing.update" : "listing.status",
+        summary: what === "edited" ? `Edited listing “${updated.title}”` : `Listing “${updated.title}” ${what}`,
+        targetId: String(id),
+        targetLabel: updated.title,
+        details: { fields: changedFields(body), ...(body.paperVerificationNote ? { note: String(body.paperVerificationNote).slice(0, 300) } : {}) },
+      }, req);
+    }
     return NextResponse.json({ success: true, listing: JSON.parse(JSON.stringify(updated)) });
   } catch (error: any) {
     console.error("Admin PATCH listing error:", error);
@@ -228,7 +267,15 @@ export async function DELETE(req: NextRequest) {
     if (targets.length === 0) {
       return NextResponse.json({ error: "No listings selected" }, { status: 400 });
     }
+    const titles = (await Listing.find({ _id: { $in: targets } }).select("title").lean()).map((l) => l.title);
     const deleted = await deleteListingsCascade(targets);
+    await logActivity(auth.session, {
+      action: "listing.delete",
+      summary: titles.length === 1 ? `Deleted listing “${titles[0]}”` : `Deleted ${plural(targets.length, "listing")}`,
+      targetId: targets.join(","),
+      targetLabel: titles.slice(0, 5).join(", "),
+      details: { titles: titles.slice(0, 50) },
+    }, req);
     return NextResponse.json({ success: true, deleted });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

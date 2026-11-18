@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logActivity, plural } from "@/lib/activity";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { NewsletterSubscriber } from "@/lib/models/NewsletterSubscriber";
@@ -55,6 +56,7 @@ export async function DELETE(req: NextRequest) {
     if (!ids.length) return NextResponse.json({ error: "Nothing selected" }, { status: 400 });
     await connectToDatabase();
     const result = await NewsletterSubscriber.deleteMany({ _id: { $in: ids } });
+    await logActivity(auth.session, { action: "newsletter.delete", summary: `Removed ${plural(result.deletedCount, "newsletter subscriber")}`, targetId: ids.join(",") }, req);
     return NextResponse.json({ success: true, deleted: result.deletedCount });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

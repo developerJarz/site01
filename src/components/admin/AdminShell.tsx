@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  Activity, BarChart3, Bell, BookOpen, Car, ChevronsLeft, ChevronsRight, Clock, CornerDownLeft, ExternalLink, FileSearch, Inbox, LayoutDashboard,
+  Activity, BarChart3, Bell, BookOpen, Car, ChevronsLeft, ChevronsRight, Clock, CornerDownLeft, ExternalLink, FileSearch, History, Inbox, LayoutDashboard,
   Lock, LogOut, Mail, Menu, Palette, Search, SearchCheck, Settings, ShieldCheck, Store, Users, X,
 } from "lucide-react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
@@ -60,6 +60,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/settings", label: "Site settings", icon: Settings },
       { href: "/admin/system", label: "System health", icon: Activity },
+      { href: "/admin/activity", label: "Activity log", icon: History },
     ],
   },
 ];

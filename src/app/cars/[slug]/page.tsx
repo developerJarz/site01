@@ -9,6 +9,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Listing } from "@/lib/models/Listing";
 import "@/lib/models/User";
 import { SellerContactCard } from "@/components/SellerContactCard";
+import { fuelLabel } from "@/lib/fuel";
 import { UserAvatar } from "@/components/UserAvatar";
 import { CarCard, CONDITION_LABEL, FUEL_LABEL, GEAR_LABEL, Price, type CarCardData } from "@/components/CarCard";
 import { CarGallery } from "@/components/car/CarGallery";
@@ -66,7 +67,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 }
 
 const CARD_FIELDS = {
-  title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1, transmission: 1,
+  title: 1, slug: 1, price: 1, make: 1, model: 1, year: 1, mileage: 1, fuelType: 1, fuelTypes: 1, transmission: 1,
   condition: 1, location: 1, featured: 1, paperVerified: 1, status: 1, sellerId: 1, color: 1, images: { $slice: 1 }, imageAlts: { $slice: 1 },
 };
 
@@ -110,7 +111,7 @@ export default async function CarDetailsPage(props: { params: Promise<{ slug: st
   const sellerName = seller?.dealershipName || seller?.name;
   const cardData: CarCardData = JSON.parse(JSON.stringify({
     _id: String(car._id), slug: car.slug, title: car.title, price: car.price, make: car.make, model: car.model, year: car.year,
-    mileage: car.mileage, fuelType: car.fuelType, transmission: car.transmission, condition: car.condition, location: car.location,
+    mileage: car.mileage, fuelType: car.fuelType, fuelTypes: car.fuelTypes, transmission: car.transmission, condition: car.condition, location: car.location,
     images: images.slice(0, 1), featured: car.featured, paperVerified: !!car.paperVerified, status: car.status,
     seller: seller ? { name: seller.name, role: seller.role, isVerified: !!seller.isVerified, dealershipName: seller.dealershipName || undefined } : undefined,
   }));
@@ -131,7 +132,7 @@ export default async function CarDetailsPage(props: { params: Promise<{ slug: st
       ...(car.model ? { model: car.model } : {}),
       ...(car.year ? { vehicleModelDate: String(car.year) } : {}),
       ...(car.mileage ? { mileageFromOdometer: { "@type": "QuantitativeValue", value: car.mileage, unitCode: "KMT" } } : {}),
-      ...(car.fuelType ? { fuelType: label(FUEL_LABEL, car.fuelType) } : {}),
+      ...(fuelLabel(car, FUEL_LABEL) ? { fuelType: fuelLabel(car, FUEL_LABEL) } : {}),
       ...(car.transmission ? { vehicleTransmission: label(GEAR_LABEL, car.transmission) } : {}),
       ...(car.engineSize ? { vehicleEngine: { "@type": "EngineSpecification", engineDisplacement: { "@type": "QuantitativeValue", value: car.engineSize, unitCode: "CMQ" } } } : {}),
       ...(car.color ? { color: car.color } : {}),
@@ -158,7 +159,7 @@ export default async function CarDetailsPage(props: { params: Promise<{ slug: st
   const highlights = [
     { icon: CalendarDays, label: "Year", value: car.year || "—" },
     { icon: Gauge, label: "Mileage", value: formatKm(car.mileage) },
-    { icon: Fuel, label: "Fuel", value: label(FUEL_LABEL, car.fuelType) },
+    { icon: Fuel, label: "Fuel", value: fuelLabel(car, FUEL_LABEL) || "—" },
     { icon: Settings2, label: "Transmission", value: label(GEAR_LABEL, car.transmission) },
   ];
   const specs = [
